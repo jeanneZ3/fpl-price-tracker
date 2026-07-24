@@ -2,14 +2,17 @@ import pandas as pd
 import pytest
 
 from src.dashboard.chart_helpers import (
+    POSITION_COLORS,
     POSITION_ORDER,
     POSITION_SHAPES,
     TEAM_COLORS,
+    build_position_color_scale,
     build_position_shape_scale,
     build_team_color_scale,
     compute_label_positions,
     compute_price_movers,
     compute_summary_kpis,
+    get_position_color,
     get_position_shape,
     get_team_color,
 )
@@ -51,6 +54,25 @@ class TestGetPositionShape:
         assert get_position_shape("???") == "circle"
 
 
+class TestGetPositionColor:
+    @pytest.mark.parametrize("position", POSITION_ORDER)
+    def test_known_positions_are_mapped(self, position):
+        assert get_position_color(position) == POSITION_COLORS[position]
+
+    def test_positions_have_distinct_colors(self):
+        colors = [POSITION_COLORS[p] for p in POSITION_ORDER]
+        assert len(set(colors)) == len(colors)
+
+    def test_all_mapped_colors_are_valid_hex(self):
+        for color in POSITION_COLORS.values():
+            assert color.startswith("#")
+            assert len(color) == 7
+            int(color[1:], 16)
+
+    def test_unknown_position_falls_back_to_grey(self):
+        assert get_position_color("???") == "#7F7F7F"
+
+
 class TestScales:
     def test_team_color_scale_covers_every_team_once(self):
         teams = ["Chelsea", "Arsenal", "Chelsea", "Man City"]
@@ -62,6 +84,11 @@ class TestScales:
         scale = build_position_shape_scale()
         assert scale.domain == POSITION_ORDER
         assert scale.range == [POSITION_SHAPES[p] for p in POSITION_ORDER]
+
+    def test_position_color_scale_matches_position_order(self):
+        scale = build_position_color_scale()
+        assert scale.domain == POSITION_ORDER
+        assert scale.range == [POSITION_COLORS[p] for p in POSITION_ORDER]
 
 
 def _snapshot_frame(rows):

@@ -34,13 +34,19 @@ def build_players_and_snapshots(
                 "position": position_names[element["element_type"]],
             }
         )
+        # At gameweek 0 (the preseason baseline) the FPL API still reports
+        # each player's *last season's* cumulative total_points, since the
+        # new season's points only start accruing once gameweek 1 kicks
+        # off. Zero it here so the baseline snapshot doesn't mix in a prior
+        # season's totals.
+        total_points = 0 if gameweek == 0 else element["total_points"]
         snapshots.append(
             {
                 "player_id": element["id"],
                 "gameweek": gameweek,
                 "date": date,
                 "price": element["now_cost"] / 10,
-                "total_points": element["total_points"],
+                "total_points": total_points,
                 "event_points": element["event_points"],
                 "minutes": element["minutes"],
                 "status": element["status"],

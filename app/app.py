@@ -1,8 +1,7 @@
 """Streamlit app entry point.
 
-Layout: a hero header, a KPI summary row, sidebar filters, and two tabs
-("Compare Players" for trend charts, "All Players" for the full table).
-Chart color always encodes *team* and point shape always encodes
+Layout: a hero header, sidebar filters, and two tabs ("Compare Players"
+for trend charts, "All Players" for the full table). Chart color encodes
 *position* -- see src/dashboard/chart_helpers.py -- so a legend stays
 meaningful once more than a couple of players are selected, instead of
 burning a unique hue per player.
@@ -19,11 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.dashboard.chart_helpers import (
     POSITION_LABELS,
-    build_position_shape_scale,
-    build_team_color_scale,
+    build_position_color_scale,
     compute_label_positions,
-    compute_price_movers,
-    compute_summary_kpis,
 )
 from src.database.database_setup import get_connection
 
@@ -69,14 +65,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     margin: 0;
 }
 
-div[data-testid="stMetric"] {
-    background: rgba(127, 127, 127, 0.07);
-    border: 1px solid rgba(127, 127, 127, 0.18);
-    border-radius: 12px;
-    padding: 0.9rem 1rem 0.7rem 1rem;
-}
-div[data-testid="stMetricLabel"] { font-weight: 600; opacity: 0.75; }
-
 h3 {
     border-left: 4px solid #6f2da8;
     padding-left: 0.6rem;
@@ -105,24 +93,22 @@ def load_data() -> pd.DataFrame:
 
 
 def render_price_and_points_charts(history: pd.DataFrame) -> None:
-    team_scale = build_team_color_scale(history["team"].tolist())
-    position_scale = build_position_shape_scale()
-    legend_select = alt.selection_point(fields=["team"], bind="legend")
+    position_scale = build_position_color_scale()
+    legend_select = alt.selection_point(fields=["position"], bind="legend")
 
     base = alt.Chart(history)
 
     line = base.mark_line(strokeWidth=2.5).encode(
         x=alt.X("gameweek:O", title="Gameweek"),
         y=alt.Y("price:Q", title="Price (£m)", scale=alt.Scale(zero=False)),
-        color=alt.Color("team:N", title="Team", scale=team_scale),
+        color=alt.Color("position:N", title="Position", scale=position_scale),
         detail="web_name:N",
         opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
     )
     points = base.mark_point(filled=True, size=120, strokeWidth=1, stroke="white").encode(
         x="gameweek:O",
         y="price:Q",
-        color=alt.Color("team:N", scale=team_scale, legend=None),
-        shape=alt.Shape("position:N", title="Position", scale=position_scale),
+        color=alt.Color("position:N", scale=position_scale, legend=None),
         detail="web_name:N",
         opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
         tooltip=[
@@ -147,13 +133,13 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
         x="gameweek:O",
         y=alt.Y("label_price:Q", title=None),
         text="web_name:N",
-        color=alt.Color("team:N", scale=team_scale, legend=None),
+        color=alt.Color("position:N", scale=position_scale, legend=None),
     )
 
     price_chart = (line + points + labels).properties(height=420).interactive()
     st.altair_chart(price_chart, use_container_width=True)
 
-    bar_select = alt.selection_point(fields=["team"], bind="legend")
+    bar_select = alt.selection_point(fields=["position"], bind="legend")
     points_chart = (
         alt.Chart(history)
         .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
@@ -161,7 +147,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             x=alt.X("gameweek:O", title="Gameweek"),
             y=alt.Y("event_points:Q", title="Points"),
             xOffset="web_name:N",
-            color=alt.Color("team:N", title="Team", scale=team_scale),
+            color=alt.Color("position:N", title="Position", scale=position_scale),
             opacity=alt.condition(bar_select, alt.value(1), alt.value(0.3)),
             tooltip=[
                 alt.Tooltip("web_name:N", title="Player"),
@@ -174,37 +160,8 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
         .properties(height=320)
         .add_params(bar_select)
     )
-    st.subheader("Points per gameweek")
+    st.subheader("Points over gameweeks")
     st.altair_chart(points_chart, use_container_width=True)
-
-
-def render_kpi_row(df: pd.DataFrame) -> None:
-    kpis = compute_summary_kpis(df)
-    movers = compute_price_movers(df)
-
-    row1 = st.columns(3)
-    row1[0].metric("Players tracked", kpis["players_tracked"])
-    row1[1].metric("Teams tracked", kpis["teams_tracked"])
-    row1[2].metric("Latest gameweek", kpis["latest_gameweek"])
-
-    row2 = st.columns(2)
-    if movers["riser"]:
-        r = movers["riser"]
-        row2[0].metric(
-            "Biggest riser", f"{r['web_name']} ({r['team']})", delta=f"£{r['delta']:+.1f}m"
-        )
-    else:
-        row2[0].metric("Biggest riser", "—")
-        row2[0].caption("Need 2+ gameweeks of data to compute price movement.")
-
-    if movers["faller"]:
-        f = movers["faller"]
-        row2[1].metric(
-            "Biggest faller", f"{f['web_name']} ({f['team']})", delta=f"£{f['delta']:+.1f}m"
-        )
-    else:
-        row2[1].metric("Biggest faller", "—")
-        row2[1].caption("Need 2+ gameweeks of data to compute price movement.")
 
 
 st.set_page_config(page_title="FPL Price Tracker", page_icon="⚽", layout="wide")
@@ -227,13 +184,11 @@ st.markdown(
     <div class="fpl-hero">
         <h1>⚽ FPL Price Tracker</h1>
         <p>Tracking price, points, and availability through gameweek {latest_gw}
-        (as of {df['date'].max()}). Color = team, shape = position.</p>
+        (as of {df['date'].max()}).</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
-
-render_kpi_row(df)
 
 latest = df[df["gameweek"] == df.groupby("player_id")["gameweek"].transform("max")]
 

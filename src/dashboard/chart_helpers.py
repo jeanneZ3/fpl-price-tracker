@@ -73,7 +73,18 @@ POSITION_LABELS: dict[str, str] = {
 
 POSITION_ORDER: list[str] = ["GKP", "DEF", "MID", "FWD"]
 
+# Colorblind-safe (Okabe-Ito) qualitative colors, one per position. Used as
+# the primary chart encoding since a fixed 4-category set stays legible at
+# any number of players selected, unlike one hue per team/player.
+POSITION_COLORS: dict[str, str] = {
+    "GKP": "#E69F00",
+    "DEF": "#0072B2",
+    "MID": "#009E73",
+    "FWD": "#D55E00",
+}
+
 _FALLBACK_SHAPE = "circle"
+_FALLBACK_COLOR = "#7F7F7F"
 
 
 def get_team_color(team: str) -> str:
@@ -96,6 +107,12 @@ def get_position_shape(position: str) -> str:
     return POSITION_SHAPES.get(position, _FALLBACK_SHAPE)
 
 
+def get_position_color(position: str) -> str:
+    """Hex color for a position code. Falls back to a neutral grey for any
+    unrecognized code rather than raising."""
+    return POSITION_COLORS.get(position, _FALLBACK_COLOR)
+
+
 def build_team_color_scale(teams: list[str]):
     """Altair Scale mapping each team in `teams` to `get_team_color`."""
     import altair as alt
@@ -109,6 +126,13 @@ def build_position_shape_scale():
     import altair as alt
 
     return alt.Scale(domain=POSITION_ORDER, range=[POSITION_SHAPES[p] for p in POSITION_ORDER])
+
+
+def build_position_color_scale():
+    """Altair Scale mapping the four position codes to POSITION_COLORS."""
+    import altair as alt
+
+    return alt.Scale(domain=POSITION_ORDER, range=[POSITION_COLORS[p] for p in POSITION_ORDER])
 
 
 def compute_summary_kpis(df: pd.DataFrame) -> dict:
