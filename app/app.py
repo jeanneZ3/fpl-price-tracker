@@ -19,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.dashboard.chart_helpers import (
     POSITION_LABELS,
     build_position_color_scale,
-    compute_label_positions,
     compute_point_offsets,
 )
 from src.database.database_setup import get_connection
@@ -117,56 +116,91 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
     # smallest and largest offsets across the full gameweek band.
     last_gw_rows["x_offset"] = compute_point_offsets(last_gw_rows["price"], spacing=12.0)
     offset_by_player = dict(zip(last_gw_rows["web_name"], last_gw_rows["x_offset"]))
-    history = history.assign(x_offset=history["web_name"].map(offset_by_player).fillna(0.0))
 
-    base = alt.Chart(history)
-
-    line = base.mark_line(strokeWidth=2.5).encode(
-        x=alt.X("gameweek:O", title="Gameweek"),
-        y=alt.Y("price:Q", title="Price (£m)", scale=alt.Scale(zero=False)),
-        xOffset=alt.XOffset("x_offset:Q", scale=None),
-        color=alt.Color(
-            "position:N",
-            title="Position",
-            scale=position_scale,
-            legend=position_legend,
-        ),
-        detail="web_name:N",
-        opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
+    gameweeks = sorted(history["gameweek"].astype(int).unique().tolist())
+    gameweek_domain = [gameweeks[0] - 0.5, gameweeks[-1] + 0.5]
+    gameweek_x = alt.X(
+        "gameweek:Q",
+        title="Gameweek",
+        scale=alt.Scale(domain=gameweek_domain, nice=False),
+        axis=alt.Axis(values=gameweeks, format="d", labelAngle=0),
     )
-    points = base.mark_point(filled=True, size=120, strokeWidth=1, stroke="white").encode(
-        x="gameweek:O",
-        y="price:Q",
-        xOffset=alt.XOffset("x_offset:Q", scale=None),
-        color=alt.Color("position:N", scale=position_scale, legend=None),
-        detail="web_name:N",
-        opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
-        tooltip=[
-            alt.Tooltip("web_name:N", title="Player"),
-            alt.Tooltip("team:N", title="Team"),
-            alt.Tooltip("position_label:N", title="Position"),
-            alt.Tooltip("gameweek:O", title="Gameweek"),
-            alt.Tooltip("price:Q", title="Price (£m)", format=".1f"),
-            alt.Tooltip("total_points:Q", title="Total points"),
-            alt.Tooltip("event_points:Q", title="GW points"),
-        ],
-    ).add_params(legend_select)
 
-    price_span = history["price"].max() - history["price"].min()
-    label_gap = max(price_span * 0.05, 0.15)
-    last_gw_rows["label_price"] = compute_label_positions(last_gw_rows["price"], label_gap)
+    price_layers = []
+    for player_name, x_offset in offset_by_player.items():
+        player_chart = alt.Chart(history[history["web_name"] == player_name])
+        price_layers.extend(
+            [
+                player_chart.mark_line(strokeWidth=2.5, xOffset=float(x_offset)).encode(
+                    x=gameweek_x,
+                    y=alt.Y(
+                        "price:Q",
+                        title="Price (£m)",
+                        scale=alt.Scale(zero=False, padding=30),
+                    ),
+                    color=alt.Color(
+                        "position:N",
+                        title="Position",
+                        scale=position_scale,
+                        legend=position_legend,
+                    ),
+                    opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
+                ),
+                player_chart.mark_point(
+                    filled=True,
+                    size=120,
+                    strokeWidth=1,
+                    stroke="white",
+                    xOffset=float(x_offset),
+                ).encode(
+                    x=gameweek_x,
+                    y="price:Q",
+                    color=alt.Color("position:N", scale=position_scale, legend=None),
+                    opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
+                    tooltip=[
+                        alt.Tooltip("web_name:N", title="Player"),
+                        alt.Tooltip("team:N", title="Team"),
+                        alt.Tooltip("position_label:N", title="Position"),
+                        alt.Tooltip("gameweek:O", title="Gameweek"),
+                        alt.Tooltip("price:Q", title="Price (£m)", format=".1f"),
+                        alt.Tooltip("total_points:Q", title="Total points"),
+                        alt.Tooltip("event_points:Q", title="GW points"),
+                    ],
+                ),
+            ]
+        )
 
-    labels = alt.Chart(last_gw_rows).mark_text(
-        align="left", dx=10, fontSize=11, fontWeight="bold"
+    # A single centered label per price cluster keeps equal-price names on
+    # the same horizontal level and prevents nearby markers from covering
+    # any part of a name.
+    label_rows = (
+        last_gw_rows.groupby(["gameweek", "price"], as_index=False)
+        .agg(
+            player_names=(
+                "web_name",
+                lambda names: "  ·  ".join(sorted(names, key=str.casefold)),
+            )
+        )
+    )
+
+    labels = alt.Chart(label_rows).mark_text(
+        align="center",
+        dy=-16,
+        fontSize=11,
+        fontWeight="bold",
+        color="#303245",
     ).encode(
-        x="gameweek:O",
-        y=alt.Y("label_price:Q", title=None),
-        xOffset=alt.XOffset("x_offset:Q", scale=None),
-        text="web_name:N",
-        color=alt.Color("position:N", scale=position_scale, legend=None),
+        x=gameweek_x,
+        y=alt.Y("price:Q", title=None, scale=alt.Scale(zero=False, padding=30)),
+        text="player_names:N",
     )
 
-    price_chart = (line + points + labels).properties(height=420).interactive()
+    price_chart = (
+        alt.layer(*price_layers, labels)
+        .properties(height=420)
+        .add_params(legend_select)
+        .interactive()
+    )
     st.altair_chart(price_chart, use_container_width=True)
 
     bar_select = alt.selection_point(fields=["position"], bind="legend")

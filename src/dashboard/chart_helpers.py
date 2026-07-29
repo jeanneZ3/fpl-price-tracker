@@ -74,12 +74,12 @@ POSITION_LABELS: dict[str, str] = {
 POSITION_ORDER: list[str] = ["GKP", "DEF", "MID", "FWD"]
 
 # Selected directly from the user's burgundy/green and blue reference
-# palettes. The four darker swatches keep marks and text readable on white.
+# palettes, while intentionally avoiding the green/yellow combination.
 POSITION_COLORS: dict[str, str] = {
     "GKP": "#451826",
     "DEF": "#2C367D",
-    "MID": "#608369",
-    "FWD": "#4E73D2",
+    "MID": "#4E73D2",
+    "FWD": "#23423F",
 }
 
 _FALLBACK_SHAPE = "circle"
