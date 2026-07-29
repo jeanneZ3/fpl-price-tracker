@@ -73,14 +73,13 @@ POSITION_LABELS: dict[str, str] = {
 
 POSITION_ORDER: list[str] = ["GKP", "DEF", "MID", "FWD"]
 
-# Colorblind-safe (Okabe-Ito) qualitative colors, one per position. Used as
-# the primary chart encoding since a fixed 4-category set stays legible at
-# any number of players selected, unlike one hue per team/player.
+# A vivid FPL-inspired palette with no yellow/green pairing. The hues remain
+# distinct on both light and dark backgrounds and are stable across charts.
 POSITION_COLORS: dict[str, str] = {
-    "GKP": "#E69F00",
-    "DEF": "#0072B2",
-    "MID": "#009E73",
-    "FWD": "#D55E00",
+    "GKP": "#6D28D9",
+    "DEF": "#2563EB",
+    "MID": "#D946EF",
+    "FWD": "#F43F5E",
 }
 
 _FALLBACK_SHAPE = "circle"

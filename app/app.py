@@ -20,7 +20,6 @@ from src.dashboard.chart_helpers import (
     POSITION_LABELS,
     build_position_color_scale,
     compute_label_positions,
-    compute_point_offsets,
 )
 from src.database.database_setup import get_connection
 
@@ -95,31 +94,40 @@ def load_data() -> pd.DataFrame:
 
 def render_price_and_points_charts(history: pd.DataFrame) -> None:
     position_scale = build_position_color_scale()
+    position_legend = alt.Legend(
+        title="Position",
+        orient="top",
+        direction="horizontal",
+        columns=4,
+        symbolType="circle",
+        symbolSize=110,
+        labelExpr=(
+            "datum.label === 'GKP' ? 'Goalkeeper' : "
+            "datum.label === 'DEF' ? 'Defender' : "
+            "datum.label === 'MID' ? 'Midfielder' : 'Forward'"
+        ),
+    )
     legend_select = alt.selection_point(fields=["position"], bind="legend")
 
     last_gw_rows = history[history["gameweek"] == history["gameweek"].max()].reset_index(drop=True)
-    # Players who land on the exact same price at the latest gameweek would
-    # otherwise render as a single stacked mark. Fan those out with a small,
-    # per-player pixel offset applied consistently across the whole line so
-    # the trend itself doesn't zigzag.
-    last_gw_rows["x_offset"] = compute_point_offsets(last_gw_rows["price"], spacing=10.0)
-    offset_by_player = dict(zip(last_gw_rows["web_name"], last_gw_rows["x_offset"]))
-    history = history.assign(x_offset=history["web_name"].map(offset_by_player).fillna(0.0))
 
     base = alt.Chart(history)
 
     line = base.mark_line(strokeWidth=2.5).encode(
         x=alt.X("gameweek:O", title="Gameweek"),
         y=alt.Y("price:Q", title="Price (£m)", scale=alt.Scale(zero=False)),
-        xOffset=alt.XOffset("x_offset:Q"),
-        color=alt.Color("position:N", title="Position", scale=position_scale),
+        color=alt.Color(
+            "position:N",
+            title="Position",
+            scale=position_scale,
+            legend=position_legend,
+        ),
         detail="web_name:N",
         opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
     )
     points = base.mark_point(filled=True, size=120, strokeWidth=1, stroke="white").encode(
         x="gameweek:O",
         y="price:Q",
-        xOffset=alt.XOffset("x_offset:Q"),
         color=alt.Color("position:N", scale=position_scale, legend=None),
         detail="web_name:N",
         opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
@@ -143,7 +151,6 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
     ).encode(
         x="gameweek:O",
         y=alt.Y("label_price:Q", title=None),
-        xOffset=alt.XOffset("x_offset:Q"),
         text="web_name:N",
         color=alt.Color("position:N", scale=position_scale, legend=None),
     )
@@ -159,7 +166,12 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             x=alt.X("gameweek:O", title="Gameweek"),
             y=alt.Y("event_points:Q", title="Points"),
             xOffset="web_name:N",
-            color=alt.Color("position:N", title="Position", scale=position_scale),
+            color=alt.Color(
+                "position:N",
+                title="Position",
+                scale=position_scale,
+                legend=position_legend,
+            ),
             opacity=alt.condition(bar_select, alt.value(1), alt.value(0.3)),
             tooltip=[
                 alt.Tooltip("web_name:N", title="Player"),
