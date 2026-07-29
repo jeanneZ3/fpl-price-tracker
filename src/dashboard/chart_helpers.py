@@ -216,3 +216,28 @@ def compute_label_positions(values: pd.Series, min_gap: float) -> pd.Series:
         adjusted[idx] = val
         prev = val
     return pd.Series(adjusted).reindex(values.index)
+
+
+def compute_point_offsets(values: pd.Series, spacing: float) -> pd.Series:
+    """Pixel x-offsets that fan out marks sharing the exact same value.
+
+    Several players often land on the exact same price (e.g. a cluster of
+    4.5m defenders), which makes their chart points render exactly on top
+    of one another. Grouping by value and spreading each group symmetrically
+    left/right of center keeps every mark visible without moving points that
+    don't collide with anything. The original index/order is preserved so
+    callers can assign the result straight back onto a DataFrame column and
+    feed it to an Altair xOffset encoding.
+    """
+    if values.empty:
+        return pd.Series(0.0, index=values.index)
+
+    offsets = pd.Series(0.0, index=values.index)
+    for _, group in values.groupby(values):
+        idx = group.index
+        n = len(idx)
+        if n <= 1:
+            continue
+        for i, gi in enumerate(idx):
+            offsets[gi] = spacing * (i - (n - 1) / 2)
+    return offsets

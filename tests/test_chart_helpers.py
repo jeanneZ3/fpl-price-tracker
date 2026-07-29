@@ -10,6 +10,7 @@ from src.dashboard.chart_helpers import (
     build_position_shape_scale,
     build_team_color_scale,
     compute_label_positions,
+    compute_point_offsets,
     compute_price_movers,
     compute_summary_kpis,
     get_position_color,
@@ -206,3 +207,32 @@ class TestComputeLabelPositions:
         values = pd.Series([5.0, 5.0], index=["a", "b"])
         result = compute_label_positions(values, min_gap=0)
         pd.testing.assert_series_equal(result, values, check_names=False)
+
+
+class TestComputePointOffsets:
+    def test_empty_series_returned_unchanged(self):
+        result = compute_point_offsets(pd.Series(dtype=float), spacing=10.0)
+        assert result.empty
+
+    def test_unique_values_get_zero_offset(self):
+        values = pd.Series([4.0, 5.0, 6.0], index=["a", "b", "c"])
+        result = compute_point_offsets(values, spacing=10.0)
+        assert (result == 0.0).all()
+
+    def test_colliding_values_are_spread_symmetrically_around_zero(self):
+        values = pd.Series([5.0, 5.0], index=["a", "b"])
+        result = compute_point_offsets(values, spacing=10.0)
+        assert set(result) == {-5.0, 5.0}
+        assert result["a"] + result["b"] == 0.0
+
+    def test_only_the_colliding_group_is_offset(self):
+        values = pd.Series([5.0, 5.0, 9.0], index=["a", "b", "c"])
+        result = compute_point_offsets(values, spacing=10.0)
+        assert result["c"] == 0.0
+        assert result["a"] != result["b"]
+
+    def test_three_way_collision_centers_middle_entry_on_zero(self):
+        values = pd.Series([5.0, 5.0, 5.0], index=["a", "b", "c"])
+        result = compute_point_offsets(values, spacing=10.0)
+        ordered = result.reindex(["a", "b", "c"])
+        assert list(ordered) == [-10.0, 0.0, 10.0]
