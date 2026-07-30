@@ -24,10 +24,10 @@ from src.dashboard.chart_helpers import (
 from src.database.database_setup import get_connection
 
 CHART_POSITION_COLORS = {
-    "GKP": "#451826",  # burgundy
-    "DEF": "#2C367D",  # indigo
-    "MID": "#4E73D2",  # royal blue
-    "FWD": "#23423F",  # deep teal
+    "GKP": "#A855F7",  # vibrant violet
+    "DEF": "#002FA7",  # Klein Blue
+    "MID": "#18A999",  # bright teal
+    "FWD": "#F26B5E",  # warm coral
 }
 CHART_FALLBACK_COLOR = "#7F7F7F"
 
