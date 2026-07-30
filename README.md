@@ -1,94 +1,40 @@
 # FPL Price Tracker
 
-Personal Fantasy Premier League price tracker: fetch player data from the
-FPL API, store one snapshot per gameweek in SQLite, and explore price,
-points, and availability trends in a Streamlit dashboard.
+Explore Fantasy Premier League player prices, points, ownership, and
+availability in an interactive dashboard.
 
-Live dashboard: https://fpl-price-tracker.streamlit.app/
+## Visit the Website
 
-## Project layout
+### [Open FPL Price Tracker](https://fpl-price-tracker.streamlit.app/)
 
-```
-app/app.py                     Streamlit dashboard entry point
-src/api/fpl_api.py             FPL bootstrap-static fetch + lookups
-src/database/database_setup.py SQLite schema (players, player_snapshots)
-src/database/database_queries.py  Upsert / read queries
-src/dashboard/chart_helpers.py Pure helpers for chart color/shape encoding and KPIs
-src/update/update_prices.py    Script that pulls one gameweek snapshot
-data/fpl.db                    SQLite database (committed to the repo)
-tests/                         pytest suite
-```
+The dashboard runs entirely in your browser. There is nothing to download or
+install.
 
-## Setup
+## What You Can Do
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt   # includes runtime + test deps
-```
+- Compare player prices and Gameweek points over time.
+- Filter players by position, club, or name.
+- Select every matching player at once, including a club's full squad.
+- Review injury news, availability, and chance of playing.
+- Search and sort the Player Profile table by price, ownership, form, points,
+  and status.
+- Import the latest publicly published FPL squad using a Team ID or official
+  team URL once Gameweek squad data is available.
 
-## Pulling a snapshot
+## How to Use the Dashboard
 
-```bash
-.venv/bin/python -m src.update.update_prices [--gameweek N]
-```
+1. Open the player-selection sidebar.
+2. Import a published FPL squad, or choose positions, teams, and individual
+   players manually.
+3. Use **Compare Players** to explore price and points trends.
+4. Use **Player Profile** to search and review the wider player list.
 
-Gameweek defaults to auto-detection from the FPL API (0 for the preseason
-baseline). Run this once before the season starts, then again after each
-gameweek's price changes have settled, and commit `data/fpl.db`.
+## Data and Privacy
 
-## Running the dashboard locally
+The dashboard uses publicly available Fantasy Premier League data. The squad
+importer does not request or store Premier League passwords or login
+credentials. It only reads the latest squad that FPL has made publicly
+available for the supplied Team ID.
 
-```bash
-.venv/bin/streamlit run app/app.py
-```
-
-Filters (position, team, player) live in the sidebar. Two tabs:
-
-- **Compare Players** — price-over-gameweeks and points-per-gameweek
-  charts for the selected players, plus their current availability status.
-  Chart **color always encodes team** and point **shape always encodes
-  position** (circle=GKP, square=DEF, triangle=MID, diamond=FWD) — not one
-  arbitrary hue per player — so the legend stays meaningful once more than
-  a couple of players are selected. Each player is labeled directly on
-  their line; click a legend entry to highlight just that team.
-- **All Players** — full sortable/searchable table of latest price,
-  points, ownership, and status.
-
-## Tests
-
-```bash
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest
-```
-
-Tests cover the pure logic in `src/dashboard/chart_helpers.py` (team
-color/position shape mapping, KPI and price-mover calculations, and label
-de-collision for the price chart).
-
-## Deployment
-
-Hosted on Streamlit Community Cloud, pointed at `app/app.py` on the `main`
-branch. Every push to `main` auto-redeploys — pull a new snapshot, commit
-`data/fpl.db`, and push to update the live site.
-
-## Data captured per snapshot
-
-| Field | Why it matters |
-|---|---|
-| `price` | The core metric being tracked |
-| `total_points` / `event_points` | Performance context next to price |
-| `minutes` | Explains points (or lack of) |
-| `status` / `news` / `chance_of_playing_this_round` | Availability at a glance |
-| `selected_by_percent` | Ownership often correlates with price moves |
-| `form` | Short-term scoring average |
-| `position`, `team` | Needed for filtering |
-
-Deliberately left out: ICT index, fixture difficulty, BPS breakdowns,
-transfer counts — easy to add later if wanted.
-
-## Open items
-
-- GitHub Actions automation to pull a snapshot near each gameweek's
-  price-lock window (deadlines move week to week, so this likely needs to
-  read the `events` section of `bootstrap-static` rather than a fixed cron
-  schedule).
+FPL Price Tracker is an independent fan project and is not affiliated with or
+endorsed by the Premier League.
