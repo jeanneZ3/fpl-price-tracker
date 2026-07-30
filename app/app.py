@@ -116,33 +116,6 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     margin: 0;
 }
 
-.summary-strip {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.8rem;
-    margin: 0 0 1.35rem;
-}
-.summary-card {
-    background: rgba(255, 255, 255, 0.86);
-    border: 1px solid #e7e0eb;
-    border-radius: 15px;
-    padding: 0.9rem 1rem;
-    box-shadow: 0 7px 20px rgba(47, 29, 55, 0.055);
-}
-.summary-card-label {
-    color: #817789;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.055em;
-    text-transform: uppercase;
-}
-.summary-card-value {
-    color: #31273a;
-    font-size: 1.05rem;
-    font-weight: 800;
-    margin-top: 0.18rem;
-}
-
 h3 {
     border-left: 4px solid #a45583;
     padding-left: 0.7rem;
@@ -222,28 +195,31 @@ section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
 
 .stTabs [data-baseweb="tab-list"] {
     width: fit-content;
-    gap: 0.35rem;
-    background: rgba(255, 255, 255, 0.86);
-    border: 1px solid #e5dce8;
-    border-radius: 14px;
-    padding: 0.32rem;
-    box-shadow: 0 7px 20px rgba(47, 29, 55, 0.055);
+    gap: 0.65rem;
+    background: transparent;
+    border: none;
+    padding: 0.3rem 0;
+    box-shadow: none;
 }
 
 .stTabs [data-baseweb="tab"] {
-    height: 2.7rem;
-    border-radius: 10px;
-    padding: 0 1.15rem;
+    height: 3rem;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    padding: 0 1.4rem;
     color: #655b6c;
     font-weight: 700;
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .stTabs [aria-selected="true"] {
-    background: #37003c !important;
-    color: #ffffff !important;
+    background: rgba(164, 85, 131, 0.13) !important;
+    border-color: rgba(164, 85, 131, 0.24) !important;
+    color: #61334f !important;
 }
 
-.stTabs [data-baseweb="tab-highlight"] {
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] {
     display: none;
 }
 
@@ -300,9 +276,6 @@ section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
     }
     .fpl-hero h1 {
         font-size: 1.75rem;
-    }
-    .summary-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 </style>
@@ -531,30 +504,6 @@ st.markdown(
         <h1>⚽ FPL Price Tracker</h1>
         <p>Tracking price, points, and availability through gameweek {latest_gw}
         (as of {df['date'].max()}).</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    f"""
-    <div class="summary-strip">
-        <div class="summary-card">
-            <div class="summary-card-label">Current Gameweek</div>
-            <div class="summary-card-value">Gameweek {int(latest_gw)}</div>
-        </div>
-        <div class="summary-card">
-            <div class="summary-card-label">Players Tracked</div>
-            <div class="summary-card-value">{latest['player_id'].nunique():,}</div>
-        </div>
-        <div class="summary-card">
-            <div class="summary-card-label">Premier League Clubs</div>
-            <div class="summary-card-value">{latest['team'].nunique()}</div>
-        </div>
-        <div class="summary-card">
-            <div class="summary-card-label">Latest Snapshot</div>
-            <div class="summary-card-value">{df['date'].max()}</div>
-        </div>
     </div>
     """,
     unsafe_allow_html=True,
