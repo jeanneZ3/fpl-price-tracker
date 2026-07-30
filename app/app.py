@@ -30,6 +30,7 @@ CHART_POSITION_COLORS = {
     "FWD": "#FF5500",  # vivid orange
 }
 CHART_FALLBACK_COLOR = "#7F7F7F"
+PLAYER_SELECTION_KEY = "players_to_compare"
 
 STATUS_LABELS = {
     "a": "Available",
@@ -313,10 +314,35 @@ teams = st.sidebar.multiselect(
 filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
 
 player_options = sorted(filtered_latest["web_name"].unique())
+default_players = player_options[: min(5, len(player_options))]
+
+if PLAYER_SELECTION_KEY not in st.session_state:
+    st.session_state[PLAYER_SELECTION_KEY] = default_players
+else:
+    # Changing the team or position filters can remove widget options. Keep
+    # only selections that remain valid before the multiselect is rendered.
+    st.session_state[PLAYER_SELECTION_KEY] = [
+        player
+        for player in st.session_state[PLAYER_SELECTION_KEY]
+        if player in player_options
+    ]
+
+if st.sidebar.button(
+    "Add All Players From Selected Teams",
+    disabled=not player_options,
+    use_container_width=True,
+    help="Adds every player matching the current Team and Position filters.",
+):
+    st.session_state[PLAYER_SELECTION_KEY] = player_options
+
+st.sidebar.caption(
+    f"{len(player_options)} players match the current Team and Position filters."
+)
+
 selected_players = st.sidebar.multiselect(
     "Players to compare",
     player_options,
-    default=player_options[: min(5, len(player_options))],
+    key=PLAYER_SELECTION_KEY,
 )
 
 tab_compare, tab_table = st.tabs(["📈 Compare Players", "📋 All Players"])
