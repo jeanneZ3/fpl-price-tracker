@@ -150,15 +150,30 @@ def render_position_legend() -> None:
 
 
 def render_price_and_points_charts(history: pd.DataFrame) -> None:
+    history = history.copy()
+    duplicate_names = {
+        name
+        for name, count in history.groupby("web_name")["player_id"].nunique().items()
+        if count > 1
+    }
+    history["chart_name"] = history["web_name"]
+    duplicate_mask = history["web_name"].isin(duplicate_names)
+    history.loc[duplicate_mask, "chart_name"] = (
+        history.loc[duplicate_mask, "web_name"]
+        + " ("
+        + history.loc[duplicate_mask, "team"]
+        + ")"
+    )
+
     last_gw_rows = history[history["gameweek"] == history["gameweek"].max()].copy()
-    last_gw_rows["_name_sort"] = last_gw_rows["web_name"].str.casefold()
+    last_gw_rows["_name_sort"] = last_gw_rows["chart_name"].str.casefold()
     last_gw_rows = last_gw_rows.sort_values(["price", "_name_sort"]).reset_index(drop=True)
     # Keep colliding marks individually readable without making them look as
     # though they belong to different gameweeks. These become literal
     # per-player mark offsets, so Vega-Lite cannot stretch them across the
     # full gameweek band.
     last_gw_rows["x_offset"] = compute_point_offsets(last_gw_rows["price"], spacing=12.0)
-    offset_by_player = dict(zip(last_gw_rows["web_name"], last_gw_rows["x_offset"]))
+    offset_by_player = dict(zip(last_gw_rows["player_id"], last_gw_rows["x_offset"]))
 
     gameweeks = sorted(history["gameweek"].astype(int).unique().tolist())
     gameweek_domain = [gameweeks[0] - 0.5, gameweeks[-1] + 0.5]
@@ -170,8 +185,8 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
     )
 
     price_layers = []
-    for player_name, x_offset in offset_by_player.items():
-        player_history = history[history["web_name"] == player_name]
+    for player_id, x_offset in offset_by_player.items():
+        player_history = history[history["player_id"] == player_id]
         player_chart = alt.Chart(player_history)
         player_color = get_chart_position_color(player_history["position"].iloc[0])
         price_layers.extend(
@@ -218,7 +233,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
         last_gw_rows.groupby(["gameweek", "price"], as_index=False)
         .agg(
             player_names=(
-                "web_name",
+                "chart_name",
                 lambda names: "  ·  ".join(sorted(names, key=str.casefold)),
             )
         )
@@ -313,7 +328,18 @@ teams = st.sidebar.multiselect(
 
 filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
 
-player_options = sorted(filtered_latest["web_name"].unique())
+player_option_rows = (
+    filtered_latest[["player_id", "web_name", "team"]]
+    .drop_duplicates(subset=["player_id"])
+)
+player_label_by_id = {
+    int(row.player_id): f"{row.web_name} ({row.team})"
+    for row in player_option_rows.itertuples(index=False)
+}
+player_options = sorted(
+    player_label_by_id,
+    key=lambda player_id: player_label_by_id[player_id].casefold(),
+)
 default_players = player_options[: min(5, len(player_options))]
 
 if PLAYER_SELECTION_KEY not in st.session_state:
@@ -339,19 +365,20 @@ st.sidebar.caption(
     f"{len(player_options)} players match the current Team and Position filters."
 )
 
-selected_players = st.sidebar.multiselect(
+selected_player_ids = st.sidebar.multiselect(
     "Players to compare",
     player_options,
     key=PLAYER_SELECTION_KEY,
+    format_func=lambda player_id: player_label_by_id.get(player_id, str(player_id)),
 )
 
 tab_compare, tab_table = st.tabs(["📈 Compare Players", "📋 All Players"])
 
 with tab_compare:
-    if not selected_players:
+    if not selected_player_ids:
         st.info("Select one or more players in the sidebar to see charts.")
     else:
-        history = df[df["web_name"].isin(selected_players)]
+        history = df[df["player_id"].isin(selected_player_ids)]
 
         st.subheader("Price Over Gameweeks")
         render_price_and_points_charts(history)
@@ -367,7 +394,7 @@ with tab_compare:
             "chance_of_playing_this_round",
         ]
         status_df = (
-            latest[latest["web_name"].isin(selected_players)][status_cols]
+            latest[latest["player_id"].isin(selected_player_ids)][status_cols]
             .assign(status=lambda d: d["status_icon"] + " " + d["status_label"])
             .drop(columns=["status_icon", "status_label"])
             .rename(
