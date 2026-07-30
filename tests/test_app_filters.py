@@ -24,7 +24,7 @@ def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     bulk_add_button = next(
         button
         for button in app.sidebar.button
-        if button.label == "Add All Players From Selected Teams"
+        if button.label == "Select All"
     )
     bulk_add_button.click().run(timeout=30)
 
@@ -60,4 +60,22 @@ def test_imported_squad_replaces_selection_and_resets_filters():
     )
     assert len(app.sidebar.multiselect[1].value) > 1
     assert app.sidebar.multiselect[2].value == imported_player_ids
+    assert not app.exception
+
+
+def test_sidebar_selection_actions_are_clear_and_work():
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+
+    assert [button.label for button in app.sidebar.button] == [
+        "Import Your Squad",
+        "Select All",
+        "Clear",
+    ]
+
+    clear_button = next(
+        button for button in app.sidebar.button if button.label == "Clear"
+    )
+    clear_button.click().run(timeout=30)
+
+    assert app.sidebar.multiselect[2].value == []
     assert not app.exception

@@ -324,8 +324,6 @@ st.markdown(
 
 latest = df[df["gameweek"] == df.groupby("player_id")["gameweek"].transform("max")]
 
-st.sidebar.header("⚽ Filters")
-
 # A successful dialog import reruns the full app. Apply its values before any
 # sidebar widgets are created so Streamlit can safely reset filters and replace
 # the existing player selection.
@@ -335,47 +333,6 @@ if pending_squad:
     st.session_state[TEAM_FILTER_KEY] = sorted(df["team"].unique())
     st.session_state[PLAYER_SELECTION_KEY] = pending_squad["player_ids"]
     st.session_state[IMPORT_NOTICE_KEY] = pending_squad["message"]
-
-positions = st.sidebar.multiselect(
-    "Position",
-    sorted(df["position"].unique()),
-    default=sorted(df["position"].unique()),
-    key=POSITION_FILTER_KEY,
-)
-teams = st.sidebar.multiselect(
-    "Team",
-    sorted(df["team"].unique()),
-    default=sorted(df["team"].unique()),
-    key=TEAM_FILTER_KEY,
-)
-
-filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
-
-player_option_rows = (
-    filtered_latest[["player_id", "web_name", "team"]]
-    .drop_duplicates(subset=["player_id"])
-)
-player_label_by_id = {
-    int(row.player_id): f"{row.web_name} ({row.team})"
-    for row in player_option_rows.itertuples(index=False)
-}
-player_options = sorted(
-    player_label_by_id,
-    key=lambda player_id: player_label_by_id[player_id].casefold(),
-)
-default_players = player_options[: min(5, len(player_options))]
-
-if PLAYER_SELECTION_KEY not in st.session_state:
-    st.session_state[PLAYER_SELECTION_KEY] = default_players
-else:
-    # Changing the team or position filters can remove widget options. Keep
-    # only selections that remain valid before the multiselect is rendered.
-    st.session_state[PLAYER_SELECTION_KEY] = [
-        player
-        for player in st.session_state[PLAYER_SELECTION_KEY]
-        if player in player_options
-    ]
-
 
 @st.dialog("Import Your Squad")
 def show_squad_import_dialog() -> None:
@@ -431,6 +388,12 @@ def show_squad_import_dialog() -> None:
         st.rerun()
 
 
+st.sidebar.header("⚽ Player Selection")
+st.sidebar.caption(
+    "Import a published FPL squad, or use the filters below to choose players manually."
+)
+
+st.sidebar.subheader("Import a Published Squad")
 if st.sidebar.button(
     "Import Your Squad",
     type="primary",
@@ -439,27 +402,88 @@ if st.sidebar.button(
 ):
     show_squad_import_dialog()
 
+st.sidebar.caption(
+    "Replaces your current selection. Available after FPL publishes a Gameweek squad."
+)
+
 if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
     st.sidebar.success(import_notice)
 
-if st.sidebar.button(
-    "Add All Players From Selected Teams",
+st.sidebar.divider()
+st.sidebar.subheader("Choose Players Manually")
+st.sidebar.caption(
+    "First narrow the player list by position or team. Then select individual "
+    "players—or select every player matching those filters."
+)
+
+positions = st.sidebar.multiselect(
+    "Positions",
+    sorted(df["position"].unique()),
+    default=sorted(df["position"].unique()),
+    key=POSITION_FILTER_KEY,
+    help="Only players in these positions will appear in the player list.",
+)
+teams = st.sidebar.multiselect(
+    "Teams",
+    sorted(df["team"].unique()),
+    default=sorted(df["team"].unique()),
+    key=TEAM_FILTER_KEY,
+    help="Only players from these teams will appear in the player list.",
+)
+
+filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
+
+player_option_rows = filtered_latest[
+    ["player_id", "web_name", "team"]
+].drop_duplicates(subset=["player_id"])
+player_label_by_id = {
+    int(row.player_id): f"{row.web_name} ({row.team})"
+    for row in player_option_rows.itertuples(index=False)
+}
+player_options = sorted(
+    player_label_by_id,
+    key=lambda player_id: player_label_by_id[player_id].casefold(),
+)
+default_players = player_options[: min(5, len(player_options))]
+
+if PLAYER_SELECTION_KEY not in st.session_state:
+    st.session_state[PLAYER_SELECTION_KEY] = default_players
+else:
+    # Changing the team or position filters can remove widget options. Keep
+    # only selections that remain valid before the multiselect is rendered.
+    st.session_state[PLAYER_SELECTION_KEY] = [
+        player
+        for player in st.session_state[PLAYER_SELECTION_KEY]
+        if player in player_options
+    ]
+
+st.sidebar.caption(f"**{len(player_options)} players** match the current filters.")
+
+select_all_col, clear_col = st.sidebar.columns(2)
+if select_all_col.button(
+    "Select All",
     disabled=not player_options,
     use_container_width=True,
-    help="Adds every player matching the current Team and Position filters.",
+    help="Select every player matching the current position and team filters.",
 ):
     st.session_state[PLAYER_SELECTION_KEY] = player_options
 
-st.sidebar.caption(
-    f"{len(player_options)} players match the current Team and Position filters."
-)
+if clear_col.button(
+    "Clear",
+    disabled=not st.session_state[PLAYER_SELECTION_KEY],
+    use_container_width=True,
+    help="Remove every player from the comparison.",
+):
+    st.session_state[PLAYER_SELECTION_KEY] = []
 
 selected_player_ids = st.sidebar.multiselect(
     "Players to compare",
     player_options,
     key=PLAYER_SELECTION_KEY,
     format_func=lambda player_id: player_label_by_id.get(player_id, str(player_id)),
+    help="Search by player name, then click a result to add it to the comparison.",
 )
+st.sidebar.caption(f"**{len(selected_player_ids)} selected** for the charts and status table.")
 
 tab_compare, tab_table = st.tabs(["📈 Compare Players", "📋 All Players"])
 
