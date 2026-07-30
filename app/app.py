@@ -1,7 +1,7 @@
 """Streamlit app entry point.
 
 Layout: a hero header, sidebar filters, and two tabs ("Compare Players"
-for trend charts, "All Players" for the full table). Chart color encodes
+for trend charts, "Player Profile" for the full table). Chart color encodes
 *position* -- see src/dashboard/chart_helpers.py -- so a legend stays
 meaningful once more than a couple of players are selected, instead of
 burning a unique hue per player.
@@ -61,29 +61,121 @@ CUSTOM_CSS = """
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
+.stApp {
+    background:
+        radial-gradient(circle at 82% 8%, rgba(164, 85, 131, 0.10), transparent 28rem),
+        linear-gradient(180deg, #f8f6fa 0%, #f3f0f6 100%);
+    color: #292333;
+}
+
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+.block-container {
+    max-width: 1480px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
 .fpl-hero {
-    background: linear-gradient(120deg, #37003c 0%, #6f2da8 55%, #00ff87 130%);
-    border-radius: 16px;
-    padding: 1.75rem 2rem;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 8px 24px rgba(55, 0, 60, 0.25);
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 88% 20%, rgba(255, 85, 0, 0.28), transparent 14rem),
+        linear-gradient(120deg, #26002a 0%, #531458 55%, #7d315f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 22px;
+    padding: 2.1rem 2.35rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 18px 42px rgba(55, 0, 60, 0.22);
+}
+.fpl-hero::after {
+    content: "";
+    position: absolute;
+    width: 15rem;
+    height: 15rem;
+    right: -5rem;
+    bottom: -8rem;
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 2.2rem rgba(255, 255, 255, 0.035),
+        0 0 0 4.4rem rgba(255, 255, 255, 0.025);
 }
 .fpl-hero h1 {
     color: #ffffff;
     font-weight: 800;
-    font-size: 2rem;
-    margin: 0 0 0.35rem 0;
+    font-size: 2.15rem;
+    letter-spacing: -0.035em;
+    margin: 0 0 0.45rem 0;
 }
 .fpl-hero p {
-    color: rgba(255, 255, 255, 0.88);
+    color: rgba(255, 255, 255, 0.82);
     font-size: 0.95rem;
     margin: 0;
 }
 
+.summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin: 0 0 1.35rem;
+}
+.summary-card {
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid #e7e0eb;
+    border-radius: 15px;
+    padding: 0.9rem 1rem;
+    box-shadow: 0 7px 20px rgba(47, 29, 55, 0.055);
+}
+.summary-card-label {
+    color: #817789;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+.summary-card-value {
+    color: #31273a;
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-top: 0.18rem;
+}
+
 h3 {
-    border-left: 4px solid #6f2da8;
-    padding-left: 0.6rem;
+    border-left: 4px solid #a45583;
+    padding-left: 0.7rem;
     margin-top: 1.6rem !important;
+    color: #302638;
+    letter-spacing: -0.02em;
+}
+
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at 30% 0%, rgba(164, 85, 131, 0.35), transparent 17rem),
+        linear-gradient(180deg, #2c1230 0%, #1d1023 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+    padding-top: 1.1rem;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] label {
+    color: #ffffff !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: #cfc3d5;
+    line-height: 1.45;
+}
+
+section[data-testid="stSidebar"] hr {
+    border-color: rgba(255, 255, 255, 0.13);
 }
 
 section[data-testid="stSidebar"] .stMultiSelect label,
@@ -94,6 +186,83 @@ section[data-testid="stSidebar"] .stTextInput label {
 section[data-testid="stSidebar"] h3 {
     border-left: none;
     padding-left: 0;
+    margin-top: 1rem !important;
+    font-size: 1rem;
+}
+
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+}
+
+section[data-testid="stSidebar"] .stButton > button {
+    min-height: 2.45rem;
+    border-radius: 10px;
+    font-weight: 700;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+section[data-testid="stSidebar"] .stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #ff6b24, #ff5500);
+    border-color: #ff6b24;
+    color: #ffffff;
+}
+
+section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.20);
+    color: #ffffff;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    width: fit-content;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid #e5dce8;
+    border-radius: 14px;
+    padding: 0.32rem;
+    box-shadow: 0 7px 20px rgba(47, 29, 55, 0.055);
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 2.7rem;
+    border-radius: 10px;
+    padding: 0 1.15rem;
+    color: #655b6c;
+    font-weight: 700;
+}
+
+.stTabs [aria-selected="true"] {
+    background: #37003c !important;
+    color: #ffffff !important;
+}
+
+.stTabs [data-baseweb="tab-highlight"] {
+    display: none;
+}
+
+[data-testid="stVegaLiteChart"],
+[data-testid="stDataFrame"] {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #e5dce8;
+    border-radius: 18px;
+    padding: 0.85rem;
+    box-shadow: 0 10px 28px rgba(47, 29, 55, 0.065);
+    overflow: hidden;
+}
+
+[data-testid="stTextInput"] input {
+    border-radius: 10px;
+}
+
+[data-testid="stAlert"] {
+    border-radius: 14px;
 }
 
 .position-legend {
@@ -119,6 +288,22 @@ section[data-testid="stSidebar"] h3 {
     height: 0.72rem;
     border-radius: 50%;
     display: inline-block;
+}
+
+@media (max-width: 760px) {
+    .block-container {
+        padding-top: 1rem;
+    }
+    .fpl-hero {
+        padding: 1.55rem 1.4rem;
+        border-radius: 18px;
+    }
+    .fpl-hero h1 {
+        font-size: 1.75rem;
+    }
+    .summary-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 </style>
 """
@@ -157,6 +342,26 @@ def render_position_legend() -> None:
             f'<span class="position-legend-title">Position</span>{items}</div>'
         ),
         unsafe_allow_html=True,
+    )
+
+
+def apply_chart_theme(chart: alt.TopLevelMixin) -> alt.TopLevelMixin:
+    """Apply the dashboard's shared typography and subtle chart furniture."""
+    return (
+        chart.configure_view(strokeWidth=0)
+        .configure_axis(
+            domainColor="#D8D0DD",
+            gridColor="#EEE9F1",
+            labelColor="#6E6475",
+            labelFont="Inter",
+            labelFontSize=11,
+            tickColor="#D8D0DD",
+            titleColor="#4A3F51",
+            titleFont="Inter",
+            titleFontSize=12,
+            titleFontWeight=600,
+            titlePadding=14,
+        )
     )
 
 
@@ -267,6 +472,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
         .properties(height=420)
         .interactive()
     )
+    price_chart = apply_chart_theme(price_chart)
     render_position_legend()
     st.altair_chart(price_chart, use_container_width=True)
 
@@ -295,7 +501,9 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
                 ],
             )
         )
-    points_chart = alt.layer(*bar_layers).properties(height=320)
+    points_chart = apply_chart_theme(
+        alt.layer(*bar_layers).properties(height=320)
+    )
     st.subheader("Points Over Gameweeks")
     render_position_legend()
     st.altair_chart(points_chart, use_container_width=True)
@@ -316,6 +524,7 @@ if df.empty:
     st.stop()
 
 latest_gw = df["gameweek"].max()
+latest = df[df["gameweek"] == df.groupby("player_id")["gameweek"].transform("max")]
 st.markdown(
     f"""
     <div class="fpl-hero">
@@ -327,7 +536,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-latest = df[df["gameweek"] == df.groupby("player_id")["gameweek"].transform("max")]
+st.markdown(
+    f"""
+    <div class="summary-strip">
+        <div class="summary-card">
+            <div class="summary-card-label">Current Gameweek</div>
+            <div class="summary-card-value">Gameweek {int(latest_gw)}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">Players Tracked</div>
+            <div class="summary-card-value">{latest['player_id'].nunique():,}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">Premier League Clubs</div>
+            <div class="summary-card-value">{latest['team'].nunique()}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">Latest Snapshot</div>
+            <div class="summary-card-value">{df['date'].max()}</div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # A successful dialog import reruns the full app. Apply its values before any
 # sidebar widgets are created so Streamlit can safely reset filters and replace
