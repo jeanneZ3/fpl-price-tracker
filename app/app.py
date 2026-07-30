@@ -21,6 +21,7 @@ from src.dashboard.chart_helpers import (
     POSITION_ORDER,
     compute_point_offsets,
 )
+from src.dashboard.status_helpers import prepare_availability_display
 from src.database.database_setup import get_connection
 
 CHART_POSITION_COLORS = {
@@ -123,7 +124,7 @@ def load_data() -> pd.DataFrame:
     df["status_label"] = df["status"].map(STATUS_LABELS).fillna(df["status"])
     df["status_icon"] = df["status"].map(STATUS_ICONS).fillna("⚪")
     df["position_label"] = df["position"].map(POSITION_LABELS).fillna(df["position"])
-    return df
+    return prepare_availability_display(df)
 
 
 def get_chart_position_color(position: str) -> str:
@@ -390,8 +391,8 @@ with tab_compare:
             "position",
             "status_icon",
             "status_label",
-            "news",
-            "chance_of_playing_this_round",
+            "display_news",
+            "display_chance",
         ]
         status_df = (
             latest[latest["player_id"].isin(selected_player_ids)][status_cols]
@@ -402,8 +403,8 @@ with tab_compare:
                     "web_name": "Player",
                     "team": "Team",
                     "position": "Pos",
-                    "news": "News",
-                    "chance_of_playing_this_round": "chance",
+                    "display_news": "News",
+                    "display_chance": "chance",
                 }
             )
             .sort_values("Player")
