@@ -20,9 +20,16 @@ from src.dashboard.chart_helpers import (
     POSITION_LABELS,
     POSITION_ORDER,
     compute_point_offsets,
-    get_position_color,
 )
 from src.database.database_setup import get_connection
+
+CHART_POSITION_COLORS = {
+    "GKP": "#451826",  # burgundy
+    "DEF": "#2C367D",  # indigo
+    "MID": "#4E73D2",  # royal blue
+    "FWD": "#23423F",  # deep teal
+}
+CHART_FALLBACK_COLOR = "#7F7F7F"
 
 STATUS_LABELS = {
     "a": "Available",
@@ -118,17 +125,25 @@ def load_data() -> pd.DataFrame:
     return df
 
 
+def get_chart_position_color(position: str) -> str:
+    """Return the exact chart color without relying on a cached helper module."""
+    return CHART_POSITION_COLORS.get(position, CHART_FALLBACK_COLOR)
+
+
 def render_position_legend() -> None:
     items = "".join(
         (
             '<span class="position-legend-item">'
-            f'<span class="position-legend-dot" style="background:{get_position_color(position)}"></span>'
+            f'<span class="position-legend-dot" style="background:{get_chart_position_color(position)}"></span>'
             f"{POSITION_LABELS[position]}</span>"
         )
         for position in POSITION_ORDER
     )
     st.markdown(
-        f'<div class="position-legend"><span class="position-legend-title">Position</span>{items}</div>',
+        (
+            '<div class="position-legend" data-palette-version="app-v2">'
+            f'<span class="position-legend-title">Position</span>{items}</div>'
+        ),
         unsafe_allow_html=True,
     )
 
@@ -157,7 +172,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
     for player_name, x_offset in offset_by_player.items():
         player_history = history[history["web_name"] == player_name]
         player_chart = alt.Chart(player_history)
-        player_color = get_position_color(player_history["position"].iloc[0])
+        player_color = get_chart_position_color(player_history["position"].iloc[0])
         price_layers.extend(
             [
                 player_chart.mark_line(
@@ -238,7 +253,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             .mark_bar(
                 cornerRadiusTopLeft=3,
                 cornerRadiusTopRight=3,
-                color=get_position_color(position),
+                color=get_chart_position_color(position),
             )
             .encode(
                 x=alt.X("gameweek:O", title="Gameweek"),
