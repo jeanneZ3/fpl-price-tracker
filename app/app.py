@@ -202,25 +202,30 @@ section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
     box-shadow: none;
 }
 
-.stTabs [data-baseweb="tab"] {
-    height: 3rem;
+.stTabs button[data-baseweb="tab"] {
+    height: 3.2rem;
     border: 1px solid transparent;
-    border-radius: 14px;
-    padding: 0 1.4rem;
+    border-bottom: none !important;
+    border-radius: 16px !important;
+    padding: 0.65rem 1.8rem !important;
+    margin: 0.2rem 0 !important;
     color: #655b6c;
     font-weight: 700;
     transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-.stTabs [aria-selected="true"] {
+.stTabs button[data-baseweb="tab"][aria-selected="true"] {
     background: rgba(164, 85, 131, 0.13) !important;
     border-color: rgba(164, 85, 131, 0.24) !important;
     color: #61334f !important;
+    box-shadow: 0 5px 14px rgba(97, 51, 79, 0.07);
 }
 
 .stTabs [data-baseweb="tab-highlight"],
 .stTabs [data-baseweb="tab-border"] {
-    display: none;
+    display: none !important;
+    height: 0 !important;
+    background: transparent !important;
 }
 
 [data-testid="stVegaLiteChart"],
