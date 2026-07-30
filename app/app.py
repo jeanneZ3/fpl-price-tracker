@@ -490,7 +490,7 @@ selected_player_ids = st.sidebar.multiselect(
 )
 st.sidebar.caption(f"**{len(selected_player_ids)} selected** for the charts and status table.")
 
-tab_compare, tab_table = st.tabs(["📈 Compare Players", "📋 All Players"])
+tab_compare, tab_table = st.tabs(["📈 Compare Players", "👤 Player Profile"])
 
 with tab_compare:
     if not selected_player_ids:
