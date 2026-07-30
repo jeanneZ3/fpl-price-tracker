@@ -91,6 +91,11 @@ section[data-testid="stSidebar"] .stTextInput label {
     font-weight: 600;
 }
 
+section[data-testid="stSidebar"] h3 {
+    border-left: none;
+    padding-left: 0;
+}
+
 .position-legend {
     display: flex;
     align-items: center;
@@ -412,8 +417,8 @@ if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
 st.sidebar.divider()
 st.sidebar.subheader("Choose Players Manually")
 st.sidebar.caption(
-    "First narrow the player list by position or team. Then select individual "
-    "players—or select every player matching those filters."
+    "Use the filters below to choose positions and/or teams. Select all matching "
+    "players at once, or choose specific players manually."
 )
 
 positions = st.sidebar.multiselect(
