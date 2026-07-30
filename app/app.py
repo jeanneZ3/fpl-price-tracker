@@ -22,6 +22,7 @@ from src.dashboard.chart_helpers import (
     compute_point_offsets,
 )
 from src.dashboard.status_helpers import prepare_availability_display
+from src.api.squad_import import SquadImportError, fetch_latest_public_squad
 from src.database.database_setup import get_connection
 
 CHART_POSITION_COLORS = {
@@ -32,6 +33,10 @@ CHART_POSITION_COLORS = {
 }
 CHART_FALLBACK_COLOR = "#7F7F7F"
 PLAYER_SELECTION_KEY = "players_to_compare"
+POSITION_FILTER_KEY = "position_filter"
+TEAM_FILTER_KEY = "team_filter"
+PENDING_SQUAD_KEY = "_pending_imported_squad"
+IMPORT_NOTICE_KEY = "_squad_import_notice"
 
 STATUS_LABELS = {
     "a": "Available",
@@ -320,11 +325,28 @@ st.markdown(
 latest = df[df["gameweek"] == df.groupby("player_id")["gameweek"].transform("max")]
 
 st.sidebar.header("⚽ Filters")
+
+# A successful dialog import reruns the full app. Apply its values before any
+# sidebar widgets are created so Streamlit can safely reset filters and replace
+# the existing player selection.
+pending_squad = st.session_state.pop(PENDING_SQUAD_KEY, None)
+if pending_squad:
+    st.session_state[POSITION_FILTER_KEY] = sorted(df["position"].unique())
+    st.session_state[TEAM_FILTER_KEY] = sorted(df["team"].unique())
+    st.session_state[PLAYER_SELECTION_KEY] = pending_squad["player_ids"]
+    st.session_state[IMPORT_NOTICE_KEY] = pending_squad["message"]
+
 positions = st.sidebar.multiselect(
-    "Position", sorted(df["position"].unique()), default=sorted(df["position"].unique())
+    "Position",
+    sorted(df["position"].unique()),
+    default=sorted(df["position"].unique()),
+    key=POSITION_FILTER_KEY,
 )
 teams = st.sidebar.multiselect(
-    "Team", sorted(df["team"].unique()), default=sorted(df["team"].unique())
+    "Team",
+    sorted(df["team"].unique()),
+    default=sorted(df["team"].unique()),
+    key=TEAM_FILTER_KEY,
 )
 
 filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
@@ -353,6 +375,72 @@ else:
         for player in st.session_state[PLAYER_SELECTION_KEY]
         if player in player_options
     ]
+
+
+@st.dialog("Import Your Squad")
+def show_squad_import_dialog() -> None:
+    st.write(
+        "Enter your FPL Team ID or paste your team URL. This imports the latest "
+        "published 15-player squad and replaces your current player selection."
+    )
+    entry_reference = st.text_input(
+        "FPL Team ID or URL",
+        placeholder="e.g. 123456 or fantasy.premierleague.com/entry/123456/event/1",
+        key="squad_entry_reference",
+    )
+    st.caption(
+        "No Premier League password is needed. Unpublished transfers cannot be imported."
+    )
+
+    if st.button(
+        "Import Latest Published Squad",
+        type="primary",
+        use_container_width=True,
+        disabled=not entry_reference.strip(),
+    ):
+        try:
+            with st.spinner("Loading your squad…"):
+                squad = fetch_latest_public_squad(entry_reference)
+        except SquadImportError as exc:
+            st.error(str(exc))
+            return
+
+        available_player_ids = set(
+            latest["player_id"].drop_duplicates().astype(int).tolist()
+        )
+        missing_player_ids = [
+            player_id
+            for player_id in squad.player_ids
+            if player_id not in available_player_ids
+        ]
+        if missing_player_ids:
+            st.error(
+                "The published squad does not match this dashboard's player data yet. "
+                "Please try again after the next data update."
+            )
+            return
+
+        imported_ids = list(dict.fromkeys(squad.player_ids))
+        st.session_state[PENDING_SQUAD_KEY] = {
+            "player_ids": imported_ids,
+            "message": (
+                f"Imported {len(imported_ids)} players from {squad.entry_name} "
+                f"(Gameweek {squad.gameweek})."
+            ),
+        }
+        st.rerun()
+
+
+if st.sidebar.button(
+    "Import Your Squad",
+    type="primary",
+    use_container_width=True,
+    help="Replace the current selection with your latest publicly available FPL squad.",
+):
+    show_squad_import_dialog()
+
+if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
+    st.sidebar.success(import_notice)
 
 if st.sidebar.button(
     "Add All Players From Selected Teams",
