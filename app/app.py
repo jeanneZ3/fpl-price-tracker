@@ -18,8 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.dashboard.chart_helpers import (
     POSITION_LABELS,
-    build_position_color_scale,
+    POSITION_ORDER,
     compute_point_offsets,
+    get_position_color,
 )
 from src.database.database_setup import get_connection
 
@@ -75,6 +76,31 @@ section[data-testid="stSidebar"] .stMultiSelect label,
 section[data-testid="stSidebar"] .stTextInput label {
     font-weight: 600;
 }
+
+.position-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
+    margin: 0.15rem 0 0.75rem 2.35rem;
+    color: #697087;
+    font-size: 0.82rem;
+}
+.position-legend-title {
+    flex-basis: 100%;
+    margin-bottom: -0.2rem;
+}
+.position-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.position-legend-dot {
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 50%;
+    display: inline-block;
+}
 </style>
 """
 
@@ -92,28 +118,29 @@ def load_data() -> pd.DataFrame:
     return df
 
 
-def render_price_and_points_charts(history: pd.DataFrame) -> None:
-    position_scale = build_position_color_scale()
-    position_legend = alt.Legend(
-        title="Position",
-        orient="top",
-        direction="horizontal",
-        columns=4,
-        symbolType="circle",
-        symbolSize=110,
-        labelExpr=(
-            "datum.label === 'GKP' ? 'Goalkeeper' : "
-            "datum.label === 'DEF' ? 'Defender' : "
-            "datum.label === 'MID' ? 'Midfielder' : 'Forward'"
-        ),
+def render_position_legend() -> None:
+    items = "".join(
+        (
+            '<span class="position-legend-item">'
+            f'<span class="position-legend-dot" style="background:{get_position_color(position)}"></span>'
+            f"{POSITION_LABELS[position]}</span>"
+        )
+        for position in POSITION_ORDER
     )
-    legend_select = alt.selection_point(fields=["position"], bind="legend")
+    st.markdown(
+        f'<div class="position-legend"><span class="position-legend-title">Position</span>{items}</div>',
+        unsafe_allow_html=True,
+    )
 
-    last_gw_rows = history[history["gameweek"] == history["gameweek"].max()].reset_index(drop=True)
+
+def render_price_and_points_charts(history: pd.DataFrame) -> None:
+    last_gw_rows = history[history["gameweek"] == history["gameweek"].max()].copy()
+    last_gw_rows["_name_sort"] = last_gw_rows["web_name"].str.casefold()
+    last_gw_rows = last_gw_rows.sort_values(["price", "_name_sort"]).reset_index(drop=True)
     # Keep colliding marks individually readable without making them look as
-    # though they belong to different gameweeks. With scale=None, Vega-Lite
-    # treats these values as literal pixel offsets rather than stretching the
-    # smallest and largest offsets across the full gameweek band.
+    # though they belong to different gameweeks. These become literal
+    # per-player mark offsets, so Vega-Lite cannot stretch them across the
+    # full gameweek band.
     last_gw_rows["x_offset"] = compute_point_offsets(last_gw_rows["price"], spacing=12.0)
     offset_by_player = dict(zip(last_gw_rows["web_name"], last_gw_rows["x_offset"]))
 
@@ -128,23 +155,22 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
 
     price_layers = []
     for player_name, x_offset in offset_by_player.items():
-        player_chart = alt.Chart(history[history["web_name"] == player_name])
+        player_history = history[history["web_name"] == player_name]
+        player_chart = alt.Chart(player_history)
+        player_color = get_position_color(player_history["position"].iloc[0])
         price_layers.extend(
             [
-                player_chart.mark_line(strokeWidth=2.5, xOffset=float(x_offset)).encode(
+                player_chart.mark_line(
+                    strokeWidth=2.5,
+                    xOffset=float(x_offset),
+                    color=player_color,
+                ).encode(
                     x=gameweek_x,
                     y=alt.Y(
                         "price:Q",
                         title="Price (£m)",
                         scale=alt.Scale(zero=False, padding=30),
                     ),
-                    color=alt.Color(
-                        "position:N",
-                        title="Position",
-                        scale=position_scale,
-                        legend=position_legend,
-                    ),
-                    opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
                 ),
                 player_chart.mark_point(
                     filled=True,
@@ -152,11 +178,10 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
                     strokeWidth=1,
                     stroke="white",
                     xOffset=float(x_offset),
+                    color=player_color,
                 ).encode(
                     x=gameweek_x,
                     y="price:Q",
-                    color=alt.Color("position:N", scale=position_scale, legend=None),
-                    opacity=alt.condition(legend_select, alt.value(1), alt.value(0.25)),
                     tooltip=[
                         alt.Tooltip("web_name:N", title="Player"),
                         alt.Tooltip("team:N", title="Team"),
@@ -198,38 +223,39 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
     price_chart = (
         alt.layer(*price_layers, labels)
         .properties(height=420)
-        .add_params(legend_select)
         .interactive()
     )
+    render_position_legend()
     st.altair_chart(price_chart, use_container_width=True)
 
-    bar_select = alt.selection_point(fields=["position"], bind="legend")
-    points_chart = (
-        alt.Chart(history)
-        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-        .encode(
-            x=alt.X("gameweek:O", title="Gameweek"),
-            y=alt.Y("event_points:Q", title="Points"),
-            xOffset="web_name:N",
-            color=alt.Color(
-                "position:N",
-                title="Position",
-                scale=position_scale,
-                legend=position_legend,
-            ),
-            opacity=alt.condition(bar_select, alt.value(1), alt.value(0.3)),
-            tooltip=[
-                alt.Tooltip("web_name:N", title="Player"),
-                alt.Tooltip("team:N", title="Team"),
-                alt.Tooltip("position_label:N", title="Position"),
-                alt.Tooltip("gameweek:O", title="Gameweek"),
-                alt.Tooltip("event_points:Q", title="GW points"),
-            ],
+    bar_layers = []
+    for position in POSITION_ORDER:
+        position_history = history[history["position"] == position]
+        if position_history.empty:
+            continue
+        bar_layers.append(
+            alt.Chart(position_history)
+            .mark_bar(
+                cornerRadiusTopLeft=3,
+                cornerRadiusTopRight=3,
+                color=get_position_color(position),
+            )
+            .encode(
+                x=alt.X("gameweek:O", title="Gameweek"),
+                y=alt.Y("event_points:Q", title="Points"),
+                xOffset="web_name:N",
+                tooltip=[
+                    alt.Tooltip("web_name:N", title="Player"),
+                    alt.Tooltip("team:N", title="Team"),
+                    alt.Tooltip("position_label:N", title="Position"),
+                    alt.Tooltip("gameweek:O", title="Gameweek"),
+                    alt.Tooltip("event_points:Q", title="GW points"),
+                ],
+            )
         )
-        .properties(height=320)
-        .add_params(bar_select)
-    )
-    st.subheader("Points over gameweeks")
+    points_chart = alt.layer(*bar_layers).properties(height=320)
+    st.subheader("Points Over Gameweeks")
+    render_position_legend()
     st.altair_chart(points_chart, use_container_width=True)
 
 
@@ -286,10 +312,10 @@ with tab_compare:
     else:
         history = df[df["web_name"].isin(selected_players)]
 
-        st.subheader("Price over gameweeks")
+        st.subheader("Price Over Gameweeks")
         render_price_and_points_charts(history)
 
-        st.subheader("Current status")
+        st.subheader("Current Status")
         status_cols = [
             "web_name",
             "team",
