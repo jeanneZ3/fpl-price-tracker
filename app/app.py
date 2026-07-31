@@ -33,6 +33,7 @@ CHART_POSITION_COLORS = {
 }
 CHART_FALLBACK_COLOR = "#7F7F7F"
 PLAYER_SELECTION_KEY = "players_to_compare"
+PLAYER_DRAFT_KEY = "players_to_compare_draft"
 POSITION_FILTER_KEY = "position_filter"
 TEAM_FILTER_KEY = "team_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
@@ -549,6 +550,7 @@ if pending_squad:
     st.session_state[POSITION_FILTER_KEY] = sorted(df["position"].unique())
     st.session_state[TEAM_FILTER_KEY] = sorted(df["team"].unique())
     st.session_state[PLAYER_SELECTION_KEY] = pending_squad["player_ids"]
+    st.session_state[PLAYER_DRAFT_KEY] = pending_squad["player_ids"]
     st.session_state[IMPORT_NOTICE_KEY] = pending_squad["message"]
 
 @st.dialog("Import Your Squad")
@@ -665,12 +667,17 @@ default_players = player_options[: min(5, len(player_options))]
 
 if PLAYER_SELECTION_KEY not in st.session_state:
     st.session_state[PLAYER_SELECTION_KEY] = default_players
+
+if PLAYER_DRAFT_KEY not in st.session_state:
+    st.session_state[PLAYER_DRAFT_KEY] = list(
+        st.session_state[PLAYER_SELECTION_KEY]
+    )
 else:
-    # Changing the team or position filters can remove widget options. Keep
-    # only selections that remain valid before the multiselect is rendered.
-    st.session_state[PLAYER_SELECTION_KEY] = [
+    # Filters only change the draft shown in the picker. The charts retain the
+    # last applied selection until the user explicitly applies the new draft.
+    st.session_state[PLAYER_DRAFT_KEY] = [
         player
-        for player in st.session_state[PLAYER_SELECTION_KEY]
+        for player in st.session_state[PLAYER_DRAFT_KEY]
         if player in player_options
     ]
 
@@ -683,24 +690,47 @@ if select_all_col.button(
     use_container_width=True,
     help="Select every player matching the current position and team filters.",
 ):
-    st.session_state[PLAYER_SELECTION_KEY] = player_options
+    st.session_state[PLAYER_DRAFT_KEY] = player_options
 
 if clear_col.button(
     "Clear",
-    disabled=not st.session_state[PLAYER_SELECTION_KEY],
+    disabled=not st.session_state[PLAYER_DRAFT_KEY],
     use_container_width=True,
-    help="Remove every player from the comparison.",
+    help="Remove every player from the draft selection.",
 ):
-    st.session_state[PLAYER_SELECTION_KEY] = []
+    st.session_state[PLAYER_DRAFT_KEY] = []
 
-selected_player_ids = st.sidebar.multiselect(
+draft_player_ids = st.sidebar.multiselect(
     "Players to compare",
     player_options,
-    key=PLAYER_SELECTION_KEY,
+    key=PLAYER_DRAFT_KEY,
     format_func=lambda player_id: player_label_by_id.get(player_id, str(player_id)),
     help="Search by player name, then click a result to add it to the comparison.",
 )
-st.sidebar.caption(f"**{len(selected_player_ids)} selected** for the charts and status table.")
+
+selection_has_changes = list(draft_player_ids) != list(
+    st.session_state[PLAYER_SELECTION_KEY]
+)
+if st.sidebar.button(
+    "Apply Selection",
+    type="primary",
+    disabled=not selection_has_changes,
+    use_container_width=True,
+    help="Refresh the charts and status table with this player selection.",
+):
+    st.session_state[PLAYER_SELECTION_KEY] = list(draft_player_ids)
+    st.rerun()
+
+if selection_has_changes:
+    st.sidebar.caption(
+        f"**{len(draft_player_ids)} selected** · Changes have not been applied yet."
+    )
+else:
+    st.sidebar.caption(
+        f"**{len(draft_player_ids)} selected** for the charts and status table."
+    )
+
+selected_player_ids = st.session_state[PLAYER_SELECTION_KEY]
 
 tab_compare, tab_table = st.tabs(["📈 Compare Players", "👤 Player Profile"])
 

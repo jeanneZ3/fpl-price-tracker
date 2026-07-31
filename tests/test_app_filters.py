@@ -31,6 +31,17 @@ def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     selected_player_ids = set(app.sidebar.multiselect[2].value)
     assert palmer_ids["Chelsea"] in selected_player_ids
     assert palmer_ids["Ipswich Town"] not in selected_player_ids
+
+    apply_button = next(
+        button
+        for button in app.sidebar.button
+        if button.label == "Apply Selection"
+    )
+    apply_button.click().run(timeout=30)
+
+    applied_player_ids = set(app.session_state["players_to_compare"])
+    assert palmer_ids["Chelsea"] in applied_player_ids
+    assert palmer_ids["Ipswich Town"] not in applied_player_ids
     assert not app.exception
 
 
@@ -70,6 +81,7 @@ def test_sidebar_selection_actions_are_clear_and_work():
         "Import Your Squad",
         "Select All",
         "Clear",
+        "Apply Selection",
     ]
 
     clear_button = next(
@@ -78,4 +90,26 @@ def test_sidebar_selection_actions_are_clear_and_work():
     clear_button.click().run(timeout=30)
 
     assert app.sidebar.multiselect[2].value == []
+    assert not app.exception
+
+
+def test_manual_player_changes_wait_for_apply_button():
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+    original_selection = list(app.session_state["players_to_compare"])
+    new_selection_label = [app.sidebar.multiselect[2].options[-1]]
+
+    app.sidebar.multiselect[2].set_value(new_selection_label).run(timeout=30)
+    new_selection_ids = list(app.sidebar.multiselect[2].value)
+
+    assert app.session_state["players_to_compare"] == original_selection
+    assert app.session_state["players_to_compare_draft"] == new_selection_ids
+
+    apply_button = next(
+        button
+        for button in app.sidebar.button
+        if button.label == "Apply Selection"
+    )
+    apply_button.click().run(timeout=30)
+
+    assert app.session_state["players_to_compare"] == new_selection_ids
     assert not app.exception
