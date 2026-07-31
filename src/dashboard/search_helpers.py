@@ -26,15 +26,20 @@ SPECIAL_LETTER_TRANSLATION = str.maketrans(
 )
 
 
-def normalize_search_text(value: object) -> str:
-    """Return a casefolded search form with accents and special letters removed."""
+def transliterate_search_text(value: object) -> str:
+    """Return text with accents and special letters converted to ASCII forms."""
     translated = str(value or "").translate(SPECIAL_LETTER_TRANSLATION)
     decomposed = unicodedata.normalize("NFKD", translated)
     return "".join(
         character
         for character in decomposed
         if not unicodedata.combining(character)
-    ).casefold()
+    )
+
+
+def normalize_search_text(value: object) -> str:
+    """Return a casefolded search form with accents and special letters removed."""
+    return transliterate_search_text(value).casefold()
 
 
 def player_name_matches(player_name: object, query: object) -> bool:

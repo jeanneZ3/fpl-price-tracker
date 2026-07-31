@@ -22,7 +22,7 @@ from src.dashboard.chart_helpers import (
     compute_point_offsets,
 )
 from src.dashboard.status_helpers import prepare_availability_display
-from src.dashboard.search_helpers import player_name_matches
+from src.dashboard.search_helpers import player_name_matches, transliterate_search_text
 from src.api.squad_import import SquadImportError, fetch_latest_public_squad
 from src.database.database_setup import get_connection
 
@@ -702,6 +702,10 @@ filtered_latest = latest[position_matches & team_matches]
 player_option_rows = filtered_latest[
     ["player_id", "web_name", "team"]
 ].drop_duplicates(subset=["player_id"])
+player_name_by_id = {
+    int(row.player_id): row.web_name
+    for row in player_option_rows.itertuples(index=False)
+}
 player_label_by_id = {
     int(row.player_id): f"{row.web_name} ({row.team})"
     for row in player_option_rows.itertuples(index=False)
@@ -747,32 +751,27 @@ if clear_col.button(
 ):
     st.session_state[PLAYER_DRAFT_KEY] = []
 
-player_search = st.sidebar.text_input(
-    "Find a player",
-    placeholder="Try Odegaard for Ødegaard",
-    help="Accents and special letters are optional when searching.",
-)
-search_result_ids = [
-    player_id
-    for player_id in player_options
-    if player_name_matches(player_label_by_id[player_id], player_search)
-]
-if player_search:
-    st.sidebar.caption(f"{len(search_result_ids)} matching players found.")
+draft_ids_for_display = set(st.session_state[PLAYER_DRAFT_KEY])
 
-# Keep every current draft value available while narrowing the suggestions by
-# name. This prevents searching for a new player from removing earlier picks.
-player_picker_options = sorted(
-    set(search_result_ids) | set(st.session_state[PLAYER_DRAFT_KEY]),
-    key=lambda player_id: player_label_by_id[player_id].casefold(),
-)
+def format_player_option(player_id: int) -> str:
+    """Show a searchable alias in choices, but never in selected-player chips."""
+    label = player_label_by_id.get(player_id, str(player_id))
+    if player_id in draft_ids_for_display:
+        return label
+
+    player_name = player_name_by_id.get(player_id, "")
+    search_alias = transliterate_search_text(player_name)
+    if search_alias.casefold() != player_name.casefold():
+        return f"{label} · Search: {search_alias}"
+    return label
 
 draft_player_ids = st.sidebar.multiselect(
     "Players to compare",
-    player_picker_options,
+    player_options,
     key=PLAYER_DRAFT_KEY,
-    format_func=lambda player_id: player_label_by_id.get(player_id, str(player_id)),
-    help="Search by player name, then click a result to add it to the comparison.",
+    format_func=format_player_option,
+    placeholder="Type a player name",
+    help="Search without accents if needed—for example, Odegaard finds Ødegaard.",
 )
 
 selection_has_changes = list(draft_player_ids) != list(

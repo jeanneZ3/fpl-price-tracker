@@ -1,6 +1,10 @@
 import pytest
 
-from src.dashboard.search_helpers import normalize_search_text, player_name_matches
+from src.dashboard.search_helpers import (
+    normalize_search_text,
+    player_name_matches,
+    transliterate_search_text,
+)
 
 
 @pytest.mark.parametrize(
@@ -16,6 +20,11 @@ from src.dashboard.search_helpers import normalize_search_text, player_name_matc
 )
 def test_normalize_search_text_handles_player_name_variants(original, expected):
     assert normalize_search_text(original) == expected
+
+
+def test_transliterate_search_text_preserves_display_case():
+    assert transliterate_search_text("Ødegaard") == "Odegaard"
+    assert transliterate_search_text("João Pedro") == "Joao Pedro"
 
 
 @pytest.mark.parametrize(

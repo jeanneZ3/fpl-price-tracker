@@ -113,10 +113,18 @@ def test_manual_player_changes_wait_for_apply_button():
     assert not app.exception
 
 
-def test_player_finder_matches_english_spelling_and_displays_original_name():
+def test_player_picker_exposes_english_alias_and_keeps_original_selected_name():
     app = AppTest.from_file("app/app.py").run(timeout=30)
 
-    app.sidebar.text_input[0].set_value("Odegaard").run(timeout=30)
+    odegaard_option = next(
+        option
+        for option in app.sidebar.multiselect[2].options
+        if "Search: Odegaard" in option
+    )
+    assert odegaard_option == "Ødegaard (Arsenal) · Search: Odegaard"
+
+    app.sidebar.multiselect[2].set_value([odegaard_option]).run(timeout=30)
 
     assert "Ødegaard (Arsenal)" in app.sidebar.multiselect[2].options
+    assert app.sidebar.multiselect[2].value == [15]
     assert not app.exception
