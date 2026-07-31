@@ -66,10 +66,8 @@ def test_imported_squad_replaces_selection_and_resets_filters():
     }
     app.run(timeout=30)
 
-    assert app.sidebar.multiselect[0].value == sorted(
-        ["GKP", "DEF", "MID", "FWD"]
-    )
-    assert len(app.sidebar.multiselect[1].value) > 1
+    assert app.sidebar.multiselect[0].value == []
+    assert app.sidebar.multiselect[1].value == []
     assert app.sidebar.multiselect[2].value == imported_player_ids
     assert not app.exception
 
@@ -81,7 +79,7 @@ def test_sidebar_selection_actions_are_clear_and_work():
         "Import Your Squad",
         "Select All",
         "Clear",
-        "Apply Selection",
+        "✓ Selection Applied",
     ]
 
     clear_button = next(

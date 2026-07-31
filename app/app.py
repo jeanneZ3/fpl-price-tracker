@@ -133,7 +133,15 @@ section[data-testid="stSidebar"] {
 }
 
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-    padding-top: 1.1rem;
+    padding-top: 0.25rem;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    margin-top: -2rem;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] {
+    gap: 0.5rem;
 }
 
 section[data-testid="stSidebar"] h1,
@@ -160,14 +168,24 @@ section[data-testid="stSidebar"] .stTextInput label {
 section[data-testid="stSidebar"] h3 {
     border-left: none;
     padding-left: 0;
-    margin-top: 1rem !important;
+    margin-top: 0.45rem !important;
     font-size: 1rem;
+}
+
+section[data-testid="stSidebar"] [data-testid="stDivider"] {
+    margin: 0.15rem 0;
 }
 
 section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
     background: rgba(255, 255, 255, 0.96);
     border-color: rgba(255, 255, 255, 0.12);
     border-radius: 10px;
+}
+
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div:first-child {
+    max-height: 7rem;
+    overflow-y: auto;
+    align-content: flex-start;
 }
 
 /* Give the clear-all and menu controls distinct, accessible tap targets. */
@@ -213,6 +231,26 @@ section[data-testid="stSidebar"] .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #ff6b24, #ff5500);
     border-color: #ff6b24;
     color: #ffffff;
+}
+
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:disabled {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    color: rgba(255, 255, 255, 0.82) !important;
+    opacity: 1 !important;
+}
+
+section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:disabled p {
+    color: rgba(255, 255, 255, 0.82) !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {
+    color: rgba(255, 255, 255, 0.88) !important;
+    font-weight: 700;
+}
+
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+    color: rgba(255, 255, 255, 0.72) !important;
 }
 
 section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
@@ -547,8 +585,8 @@ st.markdown(
 # the existing player selection.
 pending_squad = st.session_state.pop(PENDING_SQUAD_KEY, None)
 if pending_squad:
-    st.session_state[POSITION_FILTER_KEY] = sorted(df["position"].unique())
-    st.session_state[TEAM_FILTER_KEY] = sorted(df["team"].unique())
+    st.session_state[POSITION_FILTER_KEY] = []
+    st.session_state[TEAM_FILTER_KEY] = []
     st.session_state[PLAYER_SELECTION_KEY] = pending_squad["player_ids"]
     st.session_state[PLAYER_DRAFT_KEY] = pending_squad["player_ids"]
     st.session_state[IMPORT_NOTICE_KEY] = pending_squad["message"]
@@ -609,21 +647,18 @@ def show_squad_import_dialog() -> None:
 
 st.sidebar.header("⚽ Player Selection")
 st.sidebar.caption(
-    "Import a published FPL squad, or use the filters below to choose players manually."
+    "Import a published squad or choose players manually."
 )
 
-st.sidebar.subheader("Import a Published Squad")
-if st.sidebar.button(
-    "Import Your Squad",
-    type="primary",
-    use_container_width=True,
-    help="Replace the current selection with your latest publicly available FPL squad.",
-):
-    show_squad_import_dialog()
-
-st.sidebar.caption(
-    "Replaces your current selection. Available after FPL publishes a Gameweek squad."
-)
+with st.sidebar.expander("Import a Published Squad", expanded=False):
+    st.caption("Uses the latest published squad and replaces your current selection.")
+    if st.button(
+        "Import Your Squad",
+        type="primary",
+        use_container_width=True,
+        help="Replace the current selection with your latest publicly available FPL squad.",
+    ):
+        show_squad_import_dialog()
 
 if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
     st.sidebar.success(import_notice)
@@ -631,26 +666,37 @@ if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
 st.sidebar.divider()
 st.sidebar.subheader("Choose Players Manually")
 st.sidebar.caption(
-    "Use the filters below to choose positions and/or teams. Select all matching "
-    "players at once, or choose specific players manually."
+    "Filter by position or team, then select all matches or specific players."
 )
 
 positions = st.sidebar.multiselect(
     "Positions",
     sorted(df["position"].unique()),
-    default=sorted(df["position"].unique()),
+    default=[],
     key=POSITION_FILTER_KEY,
-    help="Only players in these positions will appear in the player list.",
+    placeholder="All positions",
+    help="Leave empty to include every position.",
 )
 teams = st.sidebar.multiselect(
     "Teams",
     sorted(df["team"].unique()),
-    default=sorted(df["team"].unique()),
+    default=[],
     key=TEAM_FILTER_KEY,
-    help="Only players from these teams will appear in the player list.",
+    placeholder="All teams",
+    help="Leave empty to include every team.",
 )
 
-filtered_latest = latest[latest["position"].isin(positions) & latest["team"].isin(teams)]
+position_matches = (
+    latest["position"].isin(positions)
+    if positions
+    else pd.Series(True, index=latest.index)
+)
+team_matches = (
+    latest["team"].isin(teams)
+    if teams
+    else pd.Series(True, index=latest.index)
+)
+filtered_latest = latest[position_matches & team_matches]
 
 player_option_rows = filtered_latest[
     ["player_id", "web_name", "team"]
@@ -711,8 +757,9 @@ draft_player_ids = st.sidebar.multiselect(
 selection_has_changes = list(draft_player_ids) != list(
     st.session_state[PLAYER_SELECTION_KEY]
 )
+apply_button_label = "Apply Selection" if selection_has_changes else "✓ Selection Applied"
 if st.sidebar.button(
-    "Apply Selection",
+    apply_button_label,
     type="primary",
     disabled=not selection_has_changes,
     use_container_width=True,
