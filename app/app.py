@@ -39,6 +39,7 @@ POSITION_FILTER_KEY = "position_filter"
 TEAM_FILTER_KEY = "team_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
 IMPORT_NOTICE_KEY = "_squad_import_notice"
+DEFAULT_TEAM = "Arsenal"
 
 STATUS_LABELS = {
     "a": "Available",
@@ -706,6 +707,10 @@ player_name_by_id = {
     int(row.player_id): row.web_name
     for row in player_option_rows.itertuples(index=False)
 }
+player_team_by_id = {
+    int(row.player_id): row.team
+    for row in player_option_rows.itertuples(index=False)
+}
 player_label_by_id = {
     int(row.player_id): f"{row.web_name} ({row.team})"
     for row in player_option_rows.itertuples(index=False)
@@ -714,7 +719,13 @@ player_options = sorted(
     player_label_by_id,
     key=lambda player_id: player_label_by_id[player_id].casefold(),
 )
-default_players = player_options[: min(5, len(player_options))]
+default_players = [
+    player_id
+    for player_id in player_options
+    if player_team_by_id[player_id] == DEFAULT_TEAM
+]
+if not default_players:
+    default_players = player_options[: min(5, len(player_options))]
 
 if PLAYER_SELECTION_KEY not in st.session_state:
     st.session_state[PLAYER_SELECTION_KEY] = default_players

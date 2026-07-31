@@ -3,6 +3,25 @@ from streamlit.testing.v1 import AppTest
 from src.database.database_setup import get_connection
 
 
+def test_default_selection_is_the_full_arsenal_squad():
+    conn = get_connection()
+    try:
+        arsenal_player_ids = {
+            row[0]
+            for row in conn.execute(
+                "SELECT player_id FROM players WHERE team = 'Arsenal'"
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+
+    assert set(app.session_state["players_to_compare"]) == arsenal_player_ids
+    assert set(app.session_state["players_to_compare_draft"]) == arsenal_player_ids
+    assert not app.exception
+
+
 def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     conn = get_connection()
     try:
@@ -115,6 +134,7 @@ def test_manual_player_changes_wait_for_apply_button():
 
 def test_player_picker_exposes_english_alias_and_keeps_original_selected_name():
     app = AppTest.from_file("app/app.py").run(timeout=30)
+    app.sidebar.multiselect[2].set_value([]).run(timeout=30)
 
     odegaard_option = next(
         option
