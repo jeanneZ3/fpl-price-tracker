@@ -22,6 +22,7 @@ from src.dashboard.chart_helpers import (
     compute_point_offsets,
 )
 from src.dashboard.status_helpers import prepare_availability_display
+from src.dashboard.search_helpers import player_name_matches
 from src.api.squad_import import SquadImportError, fetch_latest_public_squad
 from src.database.database_setup import get_connection
 
@@ -746,9 +747,29 @@ if clear_col.button(
 ):
     st.session_state[PLAYER_DRAFT_KEY] = []
 
+player_search = st.sidebar.text_input(
+    "Find a player",
+    placeholder="Try Odegaard for Ødegaard",
+    help="Accents and special letters are optional when searching.",
+)
+search_result_ids = [
+    player_id
+    for player_id in player_options
+    if player_name_matches(player_label_by_id[player_id], player_search)
+]
+if player_search:
+    st.sidebar.caption(f"{len(search_result_ids)} matching players found.")
+
+# Keep every current draft value available while narrowing the suggestions by
+# name. This prevents searching for a new player from removing earlier picks.
+player_picker_options = sorted(
+    set(search_result_ids) | set(st.session_state[PLAYER_DRAFT_KEY]),
+    key=lambda player_id: player_label_by_id[player_id].casefold(),
+)
+
 draft_player_ids = st.sidebar.multiselect(
     "Players to compare",
-    player_options,
+    player_picker_options,
     key=PLAYER_DRAFT_KEY,
     format_func=lambda player_id: player_label_by_id.get(player_id, str(player_id)),
     help="Search by player name, then click a result to add it to the comparison.",
@@ -831,7 +852,11 @@ with tab_table:
     search = st.text_input("Search player", placeholder="Type a name…")
     table_df = filtered_latest
     if search:
-        table_df = table_df[table_df["web_name"].str.contains(search, case=False, na=False)]
+        table_df = table_df[
+            table_df["web_name"].map(
+                lambda player_name: player_name_matches(player_name, search)
+            )
+        ]
 
     table_cols = [
         "web_name",

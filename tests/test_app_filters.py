@@ -111,3 +111,12 @@ def test_manual_player_changes_wait_for_apply_button():
 
     assert app.session_state["players_to_compare"] == new_selection_ids
     assert not app.exception
+
+
+def test_player_finder_matches_english_spelling_and_displays_original_name():
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+
+    app.sidebar.text_input[0].set_value("Odegaard").run(timeout=30)
+
+    assert "Ødegaard (Arsenal)" in app.sidebar.multiselect[2].options
+    assert not app.exception
