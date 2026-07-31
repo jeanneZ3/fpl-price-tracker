@@ -22,7 +22,7 @@ from src.dashboard.chart_helpers import (
     compute_point_offsets,
 )
 from src.dashboard.status_helpers import prepare_availability_display
-from src.dashboard.search_helpers import player_name_matches, transliterate_search_text
+from src.dashboard.search_helpers import normalize_search_text, player_name_matches
 from src.api.squad_import import SquadImportError, fetch_latest_public_squad
 from src.database.database_setup import get_connection
 
@@ -760,8 +760,9 @@ def format_player_option(player_id: int) -> str:
         return label
 
     player_name = player_name_by_id.get(player_id, "")
-    search_alias = transliterate_search_text(player_name)
-    if search_alias.casefold() != player_name.casefold():
+    normalized_name = normalize_search_text(player_name)
+    if normalized_name != player_name.casefold():
+        search_alias = normalized_name.title()
         return f"{label} · Search: {search_alias}"
     return label
 
