@@ -169,6 +169,33 @@ section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
     border-radius: 10px;
 }
 
+/* Give the clear-all and menu controls distinct, accessible tap targets. */
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div:last-child {
+    gap: 0.45rem;
+    padding: 0.25rem 0.45rem;
+}
+
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div:last-child > svg {
+    box-sizing: content-box;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    padding: 0.75rem;
+    background: rgba(55, 0, 60, 0.055);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div:last-child > svg:hover {
+    background: rgba(55, 0, 60, 0.09);
+    color: #37003c;
+}
+
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div > div:last-child > svg:focus-visible {
+    outline: 2px solid #a45583;
+    outline-offset: 1px;
+}
+
 section[data-testid="stSidebar"] .stButton > button {
     min-height: 2.45rem;
     border-radius: 10px;
