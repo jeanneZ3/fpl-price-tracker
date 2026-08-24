@@ -94,6 +94,7 @@ def test_imported_squad_replaces_selection_and_resets_filters():
 def test_sidebar_selection_actions_are_clear_and_work():
     app = AppTest.from_file("app/app.py").run(timeout=30)
 
+    assert len(app.sidebar.expander) == 0
     assert [button.label for button in app.sidebar.button] == [
         "Import Your Squad",
         "Select All",
