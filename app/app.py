@@ -40,7 +40,7 @@ TEAM_FILTER_KEY = "team_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
 IMPORT_NOTICE_KEY = "_squad_import_notice"
 DEFAULT_TEAM = "Arsenal"
-MAX_DIRECT_PRICE_LABELS = 12
+MAX_DIRECT_CHART_LABELS = 12
 
 STATUS_LABELS = {
     "a": "Available",
@@ -422,7 +422,23 @@ def apply_chart_theme(chart: alt.TopLevelMixin) -> alt.TopLevelMixin:
     )
 
 
-def render_price_and_points_charts(history: pd.DataFrame) -> None:
+def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
+    chart_config = {
+        "Price": {
+            "field": "price",
+            "axis_title": "Price (£m)",
+            "zero": False,
+        },
+        "Points": {
+            "field": "event_points",
+            "axis_title": "Gameweek points",
+            "zero": True,
+        },
+    }
+    config = chart_config[view]
+    value_field = config["field"]
+    value_encoding = f"{value_field}:Q"
+
     history = history.copy()
     duplicate_names = {
         name
@@ -440,12 +456,16 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
 
     last_gw_rows = history[history["gameweek"] == history["gameweek"].max()].copy()
     last_gw_rows["_name_sort"] = last_gw_rows["chart_name"].str.casefold()
-    last_gw_rows = last_gw_rows.sort_values(["price", "_name_sort"]).reset_index(drop=True)
+    last_gw_rows = last_gw_rows.sort_values(
+        [value_field, "_name_sort"]
+    ).reset_index(drop=True)
     # Keep colliding marks individually readable without making them look as
     # though they belong to different gameweeks. These become literal
     # per-player mark offsets, so Vega-Lite cannot stretch them across the
     # full gameweek band.
-    last_gw_rows["x_offset"] = compute_point_offsets(last_gw_rows["price"], spacing=12.0)
+    last_gw_rows["x_offset"] = compute_point_offsets(
+        last_gw_rows[value_field], spacing=12.0
+    )
     offset_by_player = dict(zip(last_gw_rows["player_id"], last_gw_rows["x_offset"]))
 
     gameweeks = sorted(history["gameweek"].astype(int).unique().tolist())
@@ -457,12 +477,12 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
         axis=alt.Axis(values=gameweeks, format="d", labelAngle=0),
     )
 
-    price_layers = []
+    chart_layers = []
     for player_id, x_offset in offset_by_player.items():
         player_history = history[history["player_id"] == player_id]
         player_chart = alt.Chart(player_history)
         player_color = get_chart_position_color(player_history["position"].iloc[0])
-        price_layers.extend(
+        chart_layers.extend(
             [
                 player_chart.mark_line(
                     strokeWidth=2.5,
@@ -471,9 +491,9 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
                 ).encode(
                     x=gameweek_x,
                     y=alt.Y(
-                        "price:Q",
-                        title="Price (£m)",
-                        scale=alt.Scale(zero=False, padding=30),
+                        value_encoding,
+                        title=config["axis_title"],
+                        scale=alt.Scale(zero=config["zero"], padding=30),
                     ),
                 ),
                 player_chart.mark_point(
@@ -485,7 +505,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
                     color=player_color,
                 ).encode(
                     x=gameweek_x,
-                    y="price:Q",
+                    y=value_encoding,
                     tooltip=[
                         alt.Tooltip("web_name:N", title="Player"),
                         alt.Tooltip("team:N", title="Team"),
@@ -499,13 +519,12 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             ]
         )
 
-    price_chart_layers = list(price_layers)
-    if len(offset_by_player) <= MAX_DIRECT_PRICE_LABELS:
-        # A single centered label per price cluster keeps equal-price names on
+    if len(offset_by_player) <= MAX_DIRECT_CHART_LABELS:
+        # A single centered label per value cluster keeps equal-value names on
         # the same horizontal level and prevents nearby markers from covering
         # any part of a name.
         label_rows = (
-            last_gw_rows.groupby(["gameweek", "price"], as_index=False)
+            last_gw_rows.groupby(["gameweek", value_field], as_index=False)
             .agg(
                 player_names=(
                     "chart_name",
@@ -521,56 +540,28 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             color="#303245",
         ).encode(
             x=gameweek_x,
-            y=alt.Y("price:Q", title=None, scale=alt.Scale(zero=False, padding=30)),
+            y=alt.Y(
+                value_encoding,
+                title=None,
+                scale=alt.Scale(zero=config["zero"], padding=30),
+            ),
             text="player_names:N",
         )
-        price_chart_layers.append(labels)
+        chart_layers.append(labels)
     else:
         st.caption(
             f"{len(offset_by_player)} players selected · Hover over a point to see "
             "the player name and details."
         )
 
-    price_chart = (
-        alt.layer(*price_chart_layers)
+    chart = (
+        alt.layer(*chart_layers)
         .properties(height=420)
         .interactive()
     )
-    price_chart = apply_chart_theme(price_chart)
+    chart = apply_chart_theme(chart)
     render_position_legend()
-    st.altair_chart(price_chart, use_container_width=True)
-
-    bar_layers = []
-    for position in POSITION_ORDER:
-        position_history = history[history["position"] == position]
-        if position_history.empty:
-            continue
-        bar_layers.append(
-            alt.Chart(position_history)
-            .mark_bar(
-                cornerRadiusTopLeft=3,
-                cornerRadiusTopRight=3,
-                color=get_chart_position_color(position),
-            )
-            .encode(
-                x=alt.X("gameweek:O", title="Gameweek"),
-                y=alt.Y("event_points:Q", title="Points"),
-                xOffset="web_name:N",
-                tooltip=[
-                    alt.Tooltip("web_name:N", title="Player"),
-                    alt.Tooltip("team:N", title="Team"),
-                    alt.Tooltip("position_label:N", title="Position"),
-                    alt.Tooltip("gameweek:O", title="Gameweek"),
-                    alt.Tooltip("event_points:Q", title="GW points"),
-                ],
-            )
-        )
-    points_chart = apply_chart_theme(
-        alt.layer(*bar_layers).properties(height=320)
-    )
-    st.subheader("Points Over Gameweeks")
-    render_position_legend()
-    st.altair_chart(points_chart, use_container_width=True)
+    st.altair_chart(chart, use_container_width=True)
 
 
 st.set_page_config(page_title="FPL Price Tracker", page_icon="⚽", layout="wide")
@@ -850,8 +841,14 @@ with tab_compare:
     else:
         history = df[df["player_id"].isin(selected_player_ids)]
 
-        st.subheader("Price Over Gameweeks")
-        render_price_and_points_charts(history)
+        chart_view = st.segmented_control(
+            "Chart view",
+            ["Price", "Points"],
+            default="Price",
+            key="comparison_chart_view",
+        )
+        st.subheader(f"{chart_view} Over Gameweeks")
+        render_player_trend_chart(history, chart_view)
 
         st.subheader("Current Status")
         status_cols = [
