@@ -43,7 +43,7 @@ def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     bulk_add_button = next(
         button
         for button in app.sidebar.button
-        if button.label == "Select All"
+        if button.label == "Select Matching"
     )
     bulk_add_button.click().run(timeout=30)
 
@@ -54,7 +54,7 @@ def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     apply_button = next(
         button
         for button in app.sidebar.button
-        if button.label == "Apply Selection"
+        if button.label == "Update Dashboard"
     )
     apply_button.click().run(timeout=30)
 
@@ -97,13 +97,13 @@ def test_sidebar_selection_actions_are_clear_and_work():
     assert len(app.sidebar.expander) == 0
     assert [button.label for button in app.sidebar.button] == [
         "Import Your Squad",
-        "Select All",
-        "Clear",
-        "✓ Selection Applied",
+        "Select Matching",
+        "Clear Players",
+        "✓ Dashboard Updated",
     ]
 
     clear_button = next(
-        button for button in app.sidebar.button if button.label == "Clear"
+        button for button in app.sidebar.button if button.label == "Clear Players"
     )
     clear_button.click().run(timeout=30)
 
@@ -125,7 +125,7 @@ def test_manual_player_changes_wait_for_apply_button():
     apply_button = next(
         button
         for button in app.sidebar.button
-        if button.label == "Apply Selection"
+        if button.label == "Update Dashboard"
     )
     apply_button.click().run(timeout=30)
 
