@@ -261,11 +261,26 @@ section[data-testid="stSidebar"] button[data-testid="stBaseButton-primary"]:disa
 
 section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {
     color: rgba(255, 255, 255, 0.88) !important;
-    font-weight: 700;
+    font-size: 1rem !important;
+    font-weight: 600;
 }
 
-section[data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
-    color: rgba(255, 255, 255, 0.72) !important;
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary > span {
+    gap: 0 !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary span:has(> [data-testid="stIconMaterial"]) {
+    display: none !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary svg,
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary [data-testid="stIconMaterial"] {
+    display: none !important;
 }
 
 section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
