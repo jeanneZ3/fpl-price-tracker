@@ -661,15 +661,13 @@ st.sidebar.caption(
     "Import a published squad or choose players manually."
 )
 
-with st.sidebar.expander("Import a Published Squad", expanded=False):
-    st.caption("Uses the latest published squad and replaces your current selection.")
-    if st.button(
-        "Import Your Squad",
-        type="primary",
-        use_container_width=True,
-        help="Replace the current selection with your latest publicly available FPL squad.",
-    ):
-        show_squad_import_dialog()
+if st.sidebar.button(
+    "Import Your Squad",
+    type="primary",
+    use_container_width=True,
+    help="Replace the current selection with your latest publicly available FPL squad.",
+):
+    show_squad_import_dialog()
 
 if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
     st.sidebar.success(import_notice)
