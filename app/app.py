@@ -40,6 +40,7 @@ TEAM_FILTER_KEY = "team_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
 IMPORT_NOTICE_KEY = "_squad_import_notice"
 DEFAULT_TEAM = "Arsenal"
+MAX_DIRECT_PRICE_LABELS = 12
 
 STATUS_LABELS = {
     "a": "Available",
@@ -498,33 +499,40 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
             ]
         )
 
-    # A single centered label per price cluster keeps equal-price names on
-    # the same horizontal level and prevents nearby markers from covering
-    # any part of a name.
-    label_rows = (
-        last_gw_rows.groupby(["gameweek", "price"], as_index=False)
-        .agg(
-            player_names=(
-                "chart_name",
-                lambda names: "  ·  ".join(sorted(names, key=str.casefold)),
+    price_chart_layers = list(price_layers)
+    if len(offset_by_player) <= MAX_DIRECT_PRICE_LABELS:
+        # A single centered label per price cluster keeps equal-price names on
+        # the same horizontal level and prevents nearby markers from covering
+        # any part of a name.
+        label_rows = (
+            last_gw_rows.groupby(["gameweek", "price"], as_index=False)
+            .agg(
+                player_names=(
+                    "chart_name",
+                    lambda names: "  ·  ".join(sorted(names, key=str.casefold)),
+                )
             )
         )
-    )
-
-    labels = alt.Chart(label_rows).mark_text(
-        align="center",
-        dy=-16,
-        fontSize=11,
-        fontWeight="bold",
-        color="#303245",
-    ).encode(
-        x=gameweek_x,
-        y=alt.Y("price:Q", title=None, scale=alt.Scale(zero=False, padding=30)),
-        text="player_names:N",
-    )
+        labels = alt.Chart(label_rows).mark_text(
+            align="center",
+            dy=-16,
+            fontSize=11,
+            fontWeight="bold",
+            color="#303245",
+        ).encode(
+            x=gameweek_x,
+            y=alt.Y("price:Q", title=None, scale=alt.Scale(zero=False, padding=30)),
+            text="player_names:N",
+        )
+        price_chart_layers.append(labels)
+    else:
+        st.caption(
+            f"{len(offset_by_player)} players selected · Hover over a point to see "
+            "the player name and details."
+        )
 
     price_chart = (
-        alt.layer(*price_layers, labels)
+        alt.layer(*price_chart_layers)
         .properties(height=420)
         .interactive()
     )
@@ -770,7 +778,7 @@ manual_picker.caption(f"**{len(player_options)} players** match the current filt
 
 select_all_col, clear_col = manual_picker.columns(2)
 if select_all_col.button(
-    "Select Matching",
+    "Select Matches",
     disabled=not player_options,
     use_container_width=True,
     help="Select every player matching the current position and team filters.",

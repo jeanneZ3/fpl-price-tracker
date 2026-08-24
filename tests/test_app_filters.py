@@ -43,7 +43,7 @@ def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     bulk_add_button = next(
         button
         for button in app.sidebar.button
-        if button.label == "Select Matching"
+        if button.label == "Select Matches"
     )
     bulk_add_button.click().run(timeout=30)
 
@@ -97,13 +97,13 @@ def test_sidebar_selection_actions_are_clear_and_work():
     assert len(app.sidebar.expander) == 1
     assert app.sidebar.expander[0].label == "Option 2: Select players manually"
     assert [button.label for button in app.sidebar.expander[0].button] == [
-        "Select Matching",
+        "Select Matches",
         "Clear Players",
         "✓ Dashboard Updated",
     ]
     assert [button.label for button in app.sidebar.button] == [
         "Import Your Squad",
-        "Select Matching",
+        "Select Matches",
         "Clear Players",
         "✓ Dashboard Updated",
     ]
