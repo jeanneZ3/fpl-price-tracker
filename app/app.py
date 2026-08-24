@@ -576,40 +576,62 @@ def render_price_score_scatter(
         st.info("No matching gameweeks are available for this comparison yet.")
         return
 
-    chart_layers = []
-    for position in POSITION_ORDER:
-        position_averages = averages[averages["position"] == position]
-        if position_averages.empty:
-            continue
+    show_direct_labels = len(averages) <= MAX_DIRECT_CHART_LABELS
+    score_min = float(averages["average_score"].min())
+    score_max = float(averages["average_score"].max())
+    score_span = max(score_max - score_min, 1.0)
+    score_domain = [
+        min(0.0, score_min - score_span * 0.05),
+        max(0.0, score_max + score_span * (0.25 if show_direct_labels else 0.05)),
+    ]
+    score_axis = alt.Axis(format=".1f")
+    if score_min >= 0:
+        score_axis = alt.Axis(
+            labelExpr="datum.value < 0 ? '' : format(datum.value, '.1f')"
+        )
+    score_price_pairs = pd.Series(
+        list(zip(averages["average_score"], averages["average_price"])),
+        index=averages.index,
+    )
+    averages["x_offset"] = compute_point_offsets(score_price_pairs, spacing=14.0)
 
-        position_chart = alt.Chart(position_averages)
+    chart_layers = []
+    for player_id, x_offset in zip(
+        averages["player_id"], averages["x_offset"]
+    ):
+        player_average = averages[averages["player_id"] == player_id]
+        player_chart = alt.Chart(player_average)
+        player_color = get_chart_position_color(player_average["position"].iloc[0])
         chart_layers.append(
-            position_chart.mark_circle(
+            player_chart.mark_circle(
                 filled=True,
                 size=180,
                 stroke="white",
                 strokeWidth=1.25,
-                color=get_chart_position_color(position),
+                color=player_color,
+                xOffset=float(x_offset),
             ).encode(
                 x=alt.X(
-                    "average_price:Q",
-                    title="Average price (£m)",
-                    scale=alt.Scale(zero=False, padding=30),
-                ),
-                y=alt.Y(
                     "average_score:Q",
                     title="Average score (GW points)",
-                    scale=alt.Scale(zero=True, padding=30),
+                    scale=alt.Scale(domain=score_domain, nice=False),
+                    axis=score_axis,
+                ),
+                y=alt.Y(
+                    "average_price:Q",
+                    title="Average price (£m)",
+                    scale=alt.Scale(zero=False, reverse=True, padding=30),
+                    axis=alt.Axis(format=".1f"),
                 ),
                 tooltip=[
                     alt.Tooltip("web_name:N", title="Player"),
                     alt.Tooltip("team:N", title="Team"),
                     alt.Tooltip("position_label:N", title="Position"),
                     alt.Tooltip(
-                        "average_price:Q", title="Average price (£m)", format=".2f"
+                        "average_score:Q", title="Average score", format=".2f"
                     ),
                     alt.Tooltip(
-                        "average_score:Q", title="Average score", format=".2f"
+                        "average_price:Q", title="Average price (£m)", format=".2f"
                     ),
                     alt.Tooltip(
                         "gameweeks_included:Q", title="Gameweeks included", format="d"
@@ -617,35 +639,34 @@ def render_price_score_scatter(
                 ],
             )
         )
+        if show_direct_labels:
+            chart_layers.append(
+                player_chart.mark_text(
+                    align="left",
+                    baseline="middle",
+                    dx=9,
+                    xOffset=float(x_offset),
+                    fontSize=11,
+                    fontWeight="bold",
+                    color="#303245",
+                ).encode(
+                    x=alt.X(
+                        "average_score:Q",
+                        scale=alt.Scale(domain=score_domain, nice=False),
+                    ),
+                    y=alt.Y(
+                        "average_price:Q",
+                        scale=alt.Scale(zero=False, reverse=True, padding=30),
+                    ),
+                    text="chart_name:N",
+                )
+            )
 
-    if len(averages) <= MAX_DIRECT_CHART_LABELS:
-        chart_layers.append(
-            alt.Chart(averages)
-            .mark_text(
-                align="left",
-                baseline="middle",
-                dx=9,
-                fontSize=11,
-                fontWeight="bold",
-                color="#303245",
-            )
-            .encode(
-                x=alt.X(
-                    "average_price:Q",
-                    scale=alt.Scale(zero=False, padding=30),
-                ),
-                y=alt.Y(
-                    "average_score:Q",
-                    scale=alt.Scale(zero=True, padding=30),
-                ),
-                text="chart_name:N",
-            )
-        )
-    else:
-        st.caption(
-            f"{len(averages)} players shown · Hover over a point to see the player "
-            "name and averaging details."
-        )
+    player_count = f"{len(averages)} players · " if not show_direct_labels else ""
+    st.caption(
+        f"{player_count}Farther right means a higher score; higher means a lower "
+        "price. Hover over a point for player and averaging details."
+    )
 
     chart = alt.layer(*chart_layers).properties(height=420).interactive()
     chart = apply_chart_theme(chart)

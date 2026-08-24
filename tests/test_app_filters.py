@@ -1,3 +1,5 @@
+import json
+
 from streamlit.testing.v1 import AppTest
 
 from src.database.database_setup import get_connection
@@ -136,6 +138,12 @@ def test_chart_view_switches_while_price_score_scatter_remains_visible():
     assert "Average Price vs. Average Score" in [
         heading.value for heading in app.subheader
     ]
+    scatter_spec = json.loads(app.get("vega_lite_chart")[1].proto.spec)
+    scatter_encoding = scatter_spec["layer"][0]["encoding"]
+    assert scatter_encoding["x"]["field"] == "average_score"
+    assert "datum.value < 0" in scatter_encoding["x"]["axis"]["labelExpr"]
+    assert scatter_encoding["y"]["field"] == "average_price"
+    assert scatter_encoding["y"]["scale"]["reverse"] is True
 
     chart_view.set_value("Points").run(timeout=30)
 
