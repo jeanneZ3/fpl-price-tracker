@@ -163,6 +163,10 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
     line-height: 1.45;
 }
 
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] strong {
+    color: rgba(255, 255, 255, 0.92);
+}
+
 section[data-testid="stSidebar"] hr {
     border-color: rgba(255, 255, 255, 0.13);
 }
@@ -682,12 +686,15 @@ if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
     st.sidebar.success(import_notice)
 
 st.sidebar.divider()
-st.sidebar.markdown("**Option 2: Select players manually**")
-st.sidebar.caption(
+manual_picker = st.sidebar.expander(
+    "Option 2: Select players manually",
+    expanded=False,
+)
+manual_picker.caption(
     "Filter the list, choose players, then update the dashboard."
 )
 
-positions = st.sidebar.multiselect(
+positions = manual_picker.multiselect(
     "Positions",
     sorted(df["position"].unique()),
     default=[],
@@ -695,7 +702,7 @@ positions = st.sidebar.multiselect(
     placeholder="All positions",
     help="Leave empty to include every position.",
 )
-teams = st.sidebar.multiselect(
+teams = manual_picker.multiselect(
     "Teams",
     sorted(df["team"].unique()),
     default=[],
@@ -759,9 +766,9 @@ else:
         if player in player_options
     ]
 
-st.sidebar.caption(f"**{len(player_options)} players** match the current filters.")
+manual_picker.caption(f"**{len(player_options)} players** match the current filters.")
 
-select_all_col, clear_col = st.sidebar.columns(2)
+select_all_col, clear_col = manual_picker.columns(2)
 if select_all_col.button(
     "Select Matching",
     disabled=not player_options,
@@ -793,7 +800,7 @@ def format_player_option(player_id: int) -> str:
         return f"{label} · Search: {search_alias}"
     return label
 
-draft_player_ids = st.sidebar.multiselect(
+draft_player_ids = manual_picker.multiselect(
     "Players to compare",
     player_options,
     key=PLAYER_DRAFT_KEY,
@@ -806,7 +813,7 @@ selection_has_changes = list(draft_player_ids) != list(
     st.session_state[PLAYER_SELECTION_KEY]
 )
 apply_button_label = "Update Dashboard" if selection_has_changes else "✓ Dashboard Updated"
-if st.sidebar.button(
+if manual_picker.button(
     apply_button_label,
     type="primary",
     disabled=not selection_has_changes,
@@ -817,11 +824,11 @@ if st.sidebar.button(
     st.rerun()
 
 if selection_has_changes:
-    st.sidebar.caption(
+    manual_picker.caption(
         f"**{len(draft_player_ids)} selected** · Click Update Dashboard to apply."
     )
 else:
-    st.sidebar.caption(
+    manual_picker.caption(
         f"**{len(draft_player_ids)} selected** in the charts and status table."
     )
 
