@@ -600,6 +600,14 @@ def show_squad_import_dialog() -> None:
         "Enter your FPL Team ID or paste your team URL. This imports the latest "
         "published 15-player squad and replaces your current player selection."
     )
+    st.markdown(
+        "**How to find your Team ID**\n\n"
+        "1. Log in to [Fantasy Premier League](https://fantasy.premierleague.com/) "
+        "and open **Points** or **Gameweek History**.\n"
+        "2. Find `/entry/1234567/` in the page URL. The number—`1234567` in this "
+        "example—is your Team ID.\n"
+        "3. Paste the number or the entire FPL team URL below."
+    )
     entry_reference = st.text_input(
         "FPL Team ID or URL",
         placeholder="e.g. 123456 or fantasy.premierleague.com/entry/123456/event/1",
