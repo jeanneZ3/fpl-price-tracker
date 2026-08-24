@@ -20,6 +20,7 @@ from src.dashboard.chart_helpers import (
     POSITION_LABELS,
     POSITION_ORDER,
     compute_point_offsets,
+    prepare_price_score_averages,
 )
 from src.dashboard.status_helpers import prepare_availability_display
 from src.dashboard.search_helpers import normalize_search_text, player_name_matches
@@ -39,6 +40,8 @@ POSITION_FILTER_KEY = "position_filter"
 TEAM_FILTER_KEY = "team_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
 IMPORT_NOTICE_KEY = "_squad_import_notice"
+SELECTION_SOURCE_KEY = "_selection_source"
+IMPORTED_SQUAD_HISTORY_KEY = "_imported_squad_history"
 DEFAULT_TEAM = "Arsenal"
 MAX_DIRECT_CHART_LABELS = 12
 
@@ -564,6 +567,92 @@ def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
     st.altair_chart(chart, use_container_width=True)
 
 
+def render_price_score_scatter(
+    history: pd.DataFrame,
+    ownership_by_gameweek: dict[int, tuple[int, ...]] | None = None,
+) -> None:
+    averages = prepare_price_score_averages(history, ownership_by_gameweek)
+    if averages.empty:
+        st.info("No matching gameweeks are available for this comparison yet.")
+        return
+
+    chart_layers = []
+    for position in POSITION_ORDER:
+        position_averages = averages[averages["position"] == position]
+        if position_averages.empty:
+            continue
+
+        position_chart = alt.Chart(position_averages)
+        chart_layers.append(
+            position_chart.mark_circle(
+                filled=True,
+                size=180,
+                stroke="white",
+                strokeWidth=1.25,
+                color=get_chart_position_color(position),
+            ).encode(
+                x=alt.X(
+                    "average_price:Q",
+                    title="Average price (£m)",
+                    scale=alt.Scale(zero=False, padding=30),
+                ),
+                y=alt.Y(
+                    "average_score:Q",
+                    title="Average score (GW points)",
+                    scale=alt.Scale(zero=True, padding=30),
+                ),
+                tooltip=[
+                    alt.Tooltip("web_name:N", title="Player"),
+                    alt.Tooltip("team:N", title="Team"),
+                    alt.Tooltip("position_label:N", title="Position"),
+                    alt.Tooltip(
+                        "average_price:Q", title="Average price (£m)", format=".2f"
+                    ),
+                    alt.Tooltip(
+                        "average_score:Q", title="Average score", format=".2f"
+                    ),
+                    alt.Tooltip(
+                        "gameweeks_included:Q", title="Gameweeks included", format="d"
+                    ),
+                ],
+            )
+        )
+
+    if len(averages) <= MAX_DIRECT_CHART_LABELS:
+        chart_layers.append(
+            alt.Chart(averages)
+            .mark_text(
+                align="left",
+                baseline="middle",
+                dx=9,
+                fontSize=11,
+                fontWeight="bold",
+                color="#303245",
+            )
+            .encode(
+                x=alt.X(
+                    "average_price:Q",
+                    scale=alt.Scale(zero=False, padding=30),
+                ),
+                y=alt.Y(
+                    "average_score:Q",
+                    scale=alt.Scale(zero=True, padding=30),
+                ),
+                text="chart_name:N",
+            )
+        )
+    else:
+        st.caption(
+            f"{len(averages)} players shown · Hover over a point to see the player "
+            "name and averaging details."
+        )
+
+    chart = alt.layer(*chart_layers).properties(height=420).interactive()
+    chart = apply_chart_theme(chart)
+    render_position_legend()
+    st.altair_chart(chart, use_container_width=True)
+
+
 st.set_page_config(page_title="FPL Price Tracker", page_icon="⚽", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
@@ -604,6 +693,10 @@ if pending_squad:
     st.session_state[PLAYER_SELECTION_KEY] = pending_squad["player_ids"]
     st.session_state[PLAYER_DRAFT_KEY] = pending_squad["player_ids"]
     st.session_state[IMPORT_NOTICE_KEY] = pending_squad["message"]
+    st.session_state[SELECTION_SOURCE_KEY] = "imported"
+    st.session_state[IMPORTED_SQUAD_HISTORY_KEY] = pending_squad.get(
+        "picks_by_gameweek", {}
+    )
 
 @st.dialog("Import Your Squad")
 def show_squad_import_dialog() -> None:
@@ -636,7 +729,10 @@ def show_squad_import_dialog() -> None:
     ):
         try:
             with st.spinner("Loading your squad…"):
-                squad = fetch_latest_public_squad(entry_reference)
+                squad = fetch_latest_public_squad(
+                    entry_reference,
+                    gameweeks=[int(gameweek) for gameweek in df["gameweek"].unique()],
+                )
         except SquadImportError as exc:
             st.error(str(exc))
             return
@@ -659,6 +755,7 @@ def show_squad_import_dialog() -> None:
         imported_ids = list(dict.fromkeys(squad.player_ids))
         st.session_state[PENDING_SQUAD_KEY] = {
             "player_ids": imported_ids,
+            "picks_by_gameweek": squad.picks_by_gameweek,
             "message": (
                 f"Imported {len(imported_ids)} players from {squad.entry_name} "
                 f"(Gameweek {squad.gameweek})."
@@ -752,6 +849,9 @@ if not default_players:
 if PLAYER_SELECTION_KEY not in st.session_state:
     st.session_state[PLAYER_SELECTION_KEY] = default_players
 
+if SELECTION_SOURCE_KEY not in st.session_state:
+    st.session_state[SELECTION_SOURCE_KEY] = "manual"
+
 if PLAYER_DRAFT_KEY not in st.session_state:
     st.session_state[PLAYER_DRAFT_KEY] = list(
         st.session_state[PLAYER_SELECTION_KEY]
@@ -820,6 +920,8 @@ if manual_picker.button(
     help="Refresh the charts and status table with this player selection.",
 ):
     st.session_state[PLAYER_SELECTION_KEY] = list(draft_player_ids)
+    st.session_state[SELECTION_SOURCE_KEY] = "manual"
+    st.session_state.pop(IMPORTED_SQUAD_HISTORY_KEY, None)
     st.rerun()
 
 if selection_has_changes:
@@ -849,6 +951,35 @@ with tab_compare:
         )
         st.subheader(f"{chart_view} Over Gameweeks")
         render_player_trend_chart(history, chart_view)
+
+        st.subheader("Average Price vs. Average Score")
+        ownership_by_gameweek = None
+        if st.session_state[SELECTION_SOURCE_KEY] == "imported":
+            average_scope = st.segmented_control(
+                "Average using",
+                ["Weeks in your squad", "All gameweeks"],
+                default="Weeks in your squad",
+                key="price_score_average_scope",
+            )
+            if average_scope == "Weeks in your squad":
+                ownership_by_gameweek = st.session_state.get(
+                    IMPORTED_SQUAD_HISTORY_KEY, {}
+                )
+                st.caption(
+                    "Each player's price and score are averaged only across tracked "
+                    "gameweeks when that player was in your imported squad."
+                )
+            else:
+                st.caption(
+                    "Each player's price and score are averaged across every gameweek "
+                    "stored in this dashboard."
+                )
+        else:
+            st.caption(
+                "For manually selected players, price and score are averaged across "
+                "every gameweek stored in this dashboard."
+            )
+        render_price_score_scatter(history, ownership_by_gameweek)
 
         st.subheader("Current Status")
         status_cols = [
