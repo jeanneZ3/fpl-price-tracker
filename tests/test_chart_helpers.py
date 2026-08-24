@@ -16,8 +16,8 @@ from src.dashboard.chart_helpers import (
     get_position_color,
     get_position_shape,
     get_team_color,
-    prepare_price_score_averages,
 )
+from src.dashboard.scatter_helpers import prepare_price_score_averages
 
 
 class TestGetTeamColor:
