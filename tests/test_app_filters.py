@@ -94,7 +94,13 @@ def test_imported_squad_replaces_selection_and_resets_filters():
 def test_sidebar_selection_actions_are_clear_and_work():
     app = AppTest.from_file("app/app.py").run(timeout=30)
 
-    assert len(app.sidebar.expander) == 0
+    assert len(app.sidebar.expander) == 1
+    assert app.sidebar.expander[0].label == "Option 2: Select players manually"
+    assert [button.label for button in app.sidebar.expander[0].button] == [
+        "Select Matching",
+        "Clear Players",
+        "✓ Dashboard Updated",
+    ]
     assert [button.label for button in app.sidebar.button] == [
         "Import Your Squad",
         "Select Matching",
