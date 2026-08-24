@@ -24,7 +24,7 @@ from src.dashboard.chart_helpers import (
 from src.dashboard.status_helpers import prepare_availability_display
 from src.dashboard.search_helpers import normalize_search_text, player_name_matches
 from src.api.squad_import import SquadImportError, fetch_latest_public_squad
-from src.database.database_setup import get_connection
+from src.database.database_setup import DB_PATH, get_connection
 
 CHART_POSITION_COLORS = {
     "GKP": "#000000",  # black
@@ -356,7 +356,8 @@ section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
 
 
 @st.cache_data(ttl=600)
-def load_data() -> pd.DataFrame:
+def load_data(database_mtime_ns: int) -> pd.DataFrame:
+    """Load snapshots, invalidating the cache when the database changes."""
     conn = get_connection()
     try:
         df = pd.read_sql_query(ALL_SNAPSHOTS_QUERY, conn)
@@ -558,7 +559,7 @@ def render_price_and_points_charts(history: pd.DataFrame) -> None:
 st.set_page_config(page_title="FPL Price Tracker", page_icon="⚽", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-df = load_data()
+df = load_data(DB_PATH.stat().st_mtime_ns)
 
 if df.empty:
     st.markdown(
