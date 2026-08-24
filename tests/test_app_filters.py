@@ -117,6 +117,24 @@ def test_sidebar_selection_actions_are_clear_and_work():
     assert not app.exception
 
 
+def test_chart_view_switches_between_one_price_or_points_visual():
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+
+    chart_view = app.segmented_control[0]
+    assert chart_view.label == "Chart view"
+    assert chart_view.options == ["Price", "Points"]
+    assert chart_view.value == "Price"
+    assert len(app.get("vega_lite_chart")) == 1
+    assert "Price Over Gameweeks" in [heading.value for heading in app.subheader]
+
+    chart_view.set_value("Points").run(timeout=30)
+
+    assert app.segmented_control[0].value == "Points"
+    assert len(app.get("vega_lite_chart")) == 1
+    assert "Points Over Gameweeks" in [heading.value for heading in app.subheader]
+    assert not app.exception
+
+
 def test_manual_player_changes_wait_for_apply_button():
     app = AppTest.from_file("app/app.py").run(timeout=30)
     original_selection = list(app.session_state["players_to_compare"])
