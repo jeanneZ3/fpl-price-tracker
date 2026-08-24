@@ -16,6 +16,7 @@ from src.dashboard.chart_helpers import (
     get_position_color,
     get_position_shape,
     get_team_color,
+    prepare_price_score_averages,
 )
 
 
@@ -236,3 +237,49 @@ class TestComputePointOffsets:
         result = compute_point_offsets(values, spacing=10.0)
         ordered = result.reindex(["a", "b", "c"])
         assert list(ordered) == [-10.0, 0.0, 10.0]
+
+
+class TestPreparePriceScoreAverages:
+    @staticmethod
+    def history():
+        return pd.DataFrame(
+            [
+                (1, "One", "Arsenal", "MID", "Midfielder", 1, 5.0, 2),
+                (1, "One", "Arsenal", "MID", "Midfielder", 2, 5.2, 6),
+                (2, "Two", "Chelsea", "FWD", "Forward", 1, 7.0, 1),
+                (2, "Two", "Chelsea", "FWD", "Forward", 2, 7.4, 5),
+            ],
+            columns=[
+                "player_id",
+                "web_name",
+                "team",
+                "position",
+                "position_label",
+                "gameweek",
+                "price",
+                "event_points",
+            ],
+        )
+
+    def test_all_gameweeks_average_price_and_gameweek_score(self):
+        result = prepare_price_score_averages(self.history()).set_index("player_id")
+
+        assert result.loc[1, "average_price"] == pytest.approx(5.1)
+        assert result.loc[1, "average_score"] == pytest.approx(4.0)
+        assert result.loc[1, "gameweeks_included"] == 2
+        assert result.loc[2, "average_price"] == pytest.approx(7.2)
+        assert result.loc[2, "average_score"] == pytest.approx(3.0)
+
+    def test_owned_gameweeks_exclude_weeks_before_or_after_ownership(self):
+        ownership = {1: (1,), 2: (2,)}
+
+        result = prepare_price_score_averages(
+            self.history(), ownership
+        ).set_index("player_id")
+
+        assert result.loc[1, "average_price"] == pytest.approx(5.0)
+        assert result.loc[1, "average_score"] == pytest.approx(2.0)
+        assert result.loc[1, "gameweeks_included"] == 1
+        assert result.loc[2, "average_price"] == pytest.approx(7.4)
+        assert result.loc[2, "average_score"] == pytest.approx(5.0)
+        assert result.loc[2, "gameweeks_included"] == 1

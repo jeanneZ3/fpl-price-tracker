@@ -75,9 +75,51 @@ def test_fetch_latest_public_squad():
     assert squad.entry_name == "My XI"
     assert squad.gameweek == gameweek
     assert squad.player_ids == tuple(range(1, 16))
+    assert squad.picks_by_gameweek == {gameweek: tuple(range(1, 16))}
     assert client.calls == [
         (ENTRY_URL.format(entry_id=entry_id), 15),
         (PICKS_URL.format(entry_id=entry_id, gameweek=gameweek), 15),
+    ]
+
+
+def test_fetch_includes_requested_published_gameweek_squads():
+    entry_id = 123
+    current_gameweek = 3
+    current_ids = tuple(range(1, 16))
+    first_gameweek_ids = tuple(range(2, 17))
+    client = FakeHttpClient(
+        {
+            ENTRY_URL.format(entry_id=entry_id): FakeResponse(
+                {"name": "My XI", "current_event": current_gameweek}
+            ),
+            PICKS_URL.format(
+                entry_id=entry_id, gameweek=current_gameweek
+            ): FakeResponse(
+                {"picks": [{"element": player_id} for player_id in current_ids]}
+            ),
+            PICKS_URL.format(entry_id=entry_id, gameweek=1): FakeResponse(
+                {"picks": [{"element": player_id} for player_id in first_gameweek_ids]}
+            ),
+            PICKS_URL.format(entry_id=entry_id, gameweek=2): FakeResponse(
+                status_code=404
+            ),
+        }
+    )
+
+    squad = fetch_latest_public_squad(
+        str(entry_id), http_client=client, gameweeks=[1, 2, 3, 4]
+    )
+
+    assert squad.player_ids == current_ids
+    assert squad.picks_by_gameweek == {
+        1: first_gameweek_ids,
+        3: current_ids,
+    }
+    assert client.calls == [
+        (ENTRY_URL.format(entry_id=entry_id), 15),
+        (PICKS_URL.format(entry_id=entry_id, gameweek=3), 15),
+        (PICKS_URL.format(entry_id=entry_id, gameweek=1), 15),
+        (PICKS_URL.format(entry_id=entry_id, gameweek=2), 15),
     ]
 
 

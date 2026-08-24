@@ -81,6 +81,7 @@ def test_imported_squad_replaces_selection_and_resets_filters():
     app.sidebar.multiselect[1].set_value(["Arsenal"]).run(timeout=30)
     app.session_state["_pending_imported_squad"] = {
         "player_ids": imported_player_ids,
+        "picks_by_gameweek": {1: tuple(imported_player_ids)},
         "message": "Imported test squad.",
     }
     app.run(timeout=30)
@@ -88,6 +89,12 @@ def test_imported_squad_replaces_selection_and_resets_filters():
     assert app.sidebar.multiselect[0].value == []
     assert app.sidebar.multiselect[1].value == []
     assert app.sidebar.multiselect[2].value == imported_player_ids
+    assert app.session_state["_selection_source"] == "imported"
+    assert app.segmented_control[1].label == "Average using"
+    assert app.segmented_control[1].options == [
+        "Weeks in your squad",
+        "All gameweeks",
+    ]
     assert not app.exception
 
 
@@ -117,20 +124,23 @@ def test_sidebar_selection_actions_are_clear_and_work():
     assert not app.exception
 
 
-def test_chart_view_switches_between_one_price_or_points_visual():
+def test_chart_view_switches_while_price_score_scatter_remains_visible():
     app = AppTest.from_file("app/app.py").run(timeout=30)
 
     chart_view = app.segmented_control[0]
     assert chart_view.label == "Chart view"
     assert chart_view.options == ["Price", "Points"]
     assert chart_view.value == "Price"
-    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("vega_lite_chart")) == 2
     assert "Price Over Gameweeks" in [heading.value for heading in app.subheader]
+    assert "Average Price vs. Average Score" in [
+        heading.value for heading in app.subheader
+    ]
 
     chart_view.set_value("Points").run(timeout=30)
 
     assert app.segmented_control[0].value == "Points"
-    assert len(app.get("vega_lite_chart")) == 1
+    assert len(app.get("vega_lite_chart")) == 2
     assert "Points Over Gameweeks" in [heading.value for heading in app.subheader]
     assert not app.exception
 
@@ -154,6 +164,8 @@ def test_manual_player_changes_wait_for_apply_button():
     apply_button.click().run(timeout=30)
 
     assert app.session_state["players_to_compare"] == new_selection_ids
+    assert app.session_state["_selection_source"] == "manual"
+    assert len(app.segmented_control) == 1
     assert not app.exception
 
 
