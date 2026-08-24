@@ -118,6 +118,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     font-size: 0.95rem;
     margin: 0;
 }
+.fpl-hero .fpl-data-note {
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 0.82rem;
+    margin-top: 0.45rem;
+}
 
 h3 {
     border-left: 4px solid #a45583;
@@ -576,8 +581,11 @@ st.markdown(
     f"""
     <div class="fpl-hero">
         <h1>⚽ FPL Price Tracker</h1>
-        <p>Tracking price, points, and availability through gameweek {latest_gw}
-        (as of {df['date'].max()}).</p>
+        <p>Compare FPL player prices, gameweek points, ownership, form, and
+        availability. You can import your own squad or select players manually
+        in the sidebar.</p>
+        <p class="fpl-data-note">Data through gameweek {latest_gw}
+        · Updated {df['date'].max()}</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -656,10 +664,11 @@ def show_squad_import_dialog() -> None:
         st.rerun()
 
 
-st.sidebar.header("⚽ Player Selection")
+st.sidebar.header("⚽ Choose Players")
 st.sidebar.caption(
-    "Import a published squad or choose players manually."
+    "Build your comparison using either option below."
 )
+st.sidebar.markdown("**Option 1: Import your own squad**")
 
 if st.sidebar.button(
     "Import Your Squad",
@@ -673,9 +682,9 @@ if import_notice := st.session_state.pop(IMPORT_NOTICE_KEY, None):
     st.sidebar.success(import_notice)
 
 st.sidebar.divider()
-st.sidebar.subheader("Choose Players Manually")
+st.sidebar.markdown("**Option 2: Select players manually**")
 st.sidebar.caption(
-    "Filter by position or team, then select all matches or specific players."
+    "Filter the list, choose players, then update the dashboard."
 )
 
 positions = st.sidebar.multiselect(
@@ -754,7 +763,7 @@ st.sidebar.caption(f"**{len(player_options)} players** match the current filters
 
 select_all_col, clear_col = st.sidebar.columns(2)
 if select_all_col.button(
-    "Select All",
+    "Select Matching",
     disabled=not player_options,
     use_container_width=True,
     help="Select every player matching the current position and team filters.",
@@ -762,7 +771,7 @@ if select_all_col.button(
     st.session_state[PLAYER_DRAFT_KEY] = player_options
 
 if clear_col.button(
-    "Clear",
+    "Clear Players",
     disabled=not st.session_state[PLAYER_DRAFT_KEY],
     use_container_width=True,
     help="Remove every player from the draft selection.",
@@ -796,7 +805,7 @@ draft_player_ids = st.sidebar.multiselect(
 selection_has_changes = list(draft_player_ids) != list(
     st.session_state[PLAYER_SELECTION_KEY]
 )
-apply_button_label = "Apply Selection" if selection_has_changes else "✓ Selection Applied"
+apply_button_label = "Update Dashboard" if selection_has_changes else "✓ Dashboard Updated"
 if st.sidebar.button(
     apply_button_label,
     type="primary",
@@ -809,11 +818,11 @@ if st.sidebar.button(
 
 if selection_has_changes:
     st.sidebar.caption(
-        f"**{len(draft_player_ids)} selected** · Changes have not been applied yet."
+        f"**{len(draft_player_ids)} selected** · Click Update Dashboard to apply."
     )
 else:
     st.sidebar.caption(
-        f"**{len(draft_player_ids)} selected** for the charts and status table."
+        f"**{len(draft_player_ids)} selected** in the charts and status table."
     )
 
 selected_player_ids = st.session_state[PLAYER_SELECTION_KEY]
