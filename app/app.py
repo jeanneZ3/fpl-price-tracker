@@ -24,7 +24,7 @@ from src.dashboard.chart_helpers import (
 from src.dashboard.scatter_helpers import prepare_price_score_averages
 from src.dashboard.status_helpers import prepare_availability_display
 from src.dashboard.search_helpers import normalize_search_text, player_name_matches
-from src.api.squad_import import SquadImportError, fetch_latest_public_squad
+from src.api.squad_history_import import SquadImportError, fetch_latest_public_squad
 from src.database.database_setup import DB_PATH, get_connection
 
 CHART_POSITION_COLORS = {

@@ -1,13 +1,20 @@
 import pytest
 import requests
 
-from src.api.squad_import import (
+from src.api.squad_history_import import (
     ENTRY_URL,
     PICKS_URL,
     SquadImportError,
     fetch_latest_public_squad,
     parse_entry_id,
 )
+
+
+def test_legacy_squad_import_module_reexports_current_api():
+    from src.api import squad_import
+
+    assert squad_import.fetch_latest_public_squad is fetch_latest_public_squad
+    assert squad_import.SquadImportError is SquadImportError
 
 
 class FakeResponse:
