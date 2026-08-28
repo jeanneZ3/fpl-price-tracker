@@ -130,7 +130,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 h3 {
     border-left: 4px solid #a45583;
-    padding-left: 0.7rem;
+    padding-left: 1rem !important;
     margin-top: 1.6rem !important;
     color: #302638;
     letter-spacing: -0.02em;
@@ -182,7 +182,7 @@ section[data-testid="stSidebar"] .stTextInput label {
 
 section[data-testid="stSidebar"] h3 {
     border-left: none;
-    padding-left: 0;
+    padding-left: 0 !important;
     margin-top: 0.45rem !important;
     font-size: 1rem;
 }
