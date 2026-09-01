@@ -38,6 +38,7 @@ PLAYER_SELECTION_KEY = "players_to_compare"
 PLAYER_DRAFT_KEY = "players_to_compare_draft"
 POSITION_FILTER_KEY = "position_filter"
 TEAM_FILTER_KEY = "team_filter"
+COMPARISON_POSITION_FILTER_KEY = "comparison_position_filter"
 PENDING_SQUAD_KEY = "_pending_imported_squad"
 IMPORT_NOTICE_KEY = "_squad_import_notice"
 SELECTION_SOURCE_KEY = "_selection_source"
@@ -402,7 +403,9 @@ def get_chart_position_color(position: str) -> str:
     return CHART_POSITION_COLORS.get(position, CHART_FALLBACK_COLOR)
 
 
-def render_position_legend() -> None:
+def render_position_legend(positions: list[str] | None = None) -> None:
+    """Render the chart legend for only the positions currently displayed."""
+    visible_positions = set(POSITION_ORDER if positions is None else positions)
     items = "".join(
         (
             '<span class="position-legend-item">'
@@ -410,6 +413,7 @@ def render_position_legend() -> None:
             f"{POSITION_LABELS[position]}</span>"
         )
         for position in POSITION_ORDER
+        if position in visible_positions
     )
     st.markdown(
         (
@@ -578,7 +582,7 @@ def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
         .interactive()
     )
     chart = apply_chart_theme(chart)
-    render_position_legend()
+    render_position_legend(history["position"].unique().tolist())
     st.altair_chart(chart, use_container_width=True)
 
 
@@ -685,7 +689,7 @@ def render_price_score_scatter(
 
     chart = alt.layer(*chart_layers).properties(height=420).interactive()
     chart = apply_chart_theme(chart)
-    render_position_legend()
+    render_position_legend(averages["position"].unique().tolist())
     st.altair_chart(chart, use_container_width=True)
 
 
@@ -709,10 +713,10 @@ st.markdown(
     f"""
     <div class="fpl-hero">
         <h1>⚽ FPL Price Tracker</h1>
-        <p>Compare FPL player prices, gameweek points, ownership, form, and
+        <p>Compare FPL player prices, Gameweek points, ownership, form, and
         availability. You can import your own squad or select players manually
         in the sidebar.</p>
-        <p class="fpl-data-note">Data through gameweek {latest_gw}
+        <p class="fpl-data-note">Data through Gameweek {latest_gw}
         · Updated {df['date'].max()}</p>
     </div>
     """,
@@ -733,6 +737,7 @@ if pending_squad:
     st.session_state[IMPORTED_SQUAD_HISTORY_KEY] = pending_squad.get(
         "picks_by_gameweek", {}
     )
+    st.session_state[COMPARISON_POSITION_FILTER_KEY] = "All"
 
 @st.dialog("Import Your Squad")
 def show_squad_import_dialog() -> None:
@@ -958,6 +963,7 @@ if manual_picker.button(
     st.session_state[PLAYER_SELECTION_KEY] = list(draft_player_ids)
     st.session_state[SELECTION_SOURCE_KEY] = "manual"
     st.session_state.pop(IMPORTED_SQUAD_HISTORY_KEY, None)
+    st.session_state[COMPARISON_POSITION_FILTER_KEY] = "All"
     st.rerun()
 
 if selection_has_changes:
@@ -977,82 +983,121 @@ with tab_compare:
     if not selected_player_ids:
         st.info("Select one or more players in the sidebar to see charts.")
     else:
-        history = df[df["player_id"].isin(selected_player_ids)]
-
-        chart_view = st.segmented_control(
-            "Chart view",
-            ["Price", "Points"],
-            default="Price",
-            key="comparison_chart_view",
-        )
-        st.subheader(f"{chart_view} Over Gameweeks")
-        render_player_trend_chart(history, chart_view)
-
-        st.subheader("Average Price vs. Average Score")
-        ownership_by_gameweek = None
-        if st.session_state[SELECTION_SOURCE_KEY] == "imported":
-            average_scope = st.segmented_control(
-                "Average using",
-                ["Weeks in your squad", "All gameweeks"],
-                default="Weeks in your squad",
-                key="price_score_average_scope",
+        view_control, position_control = st.columns([1, 2], gap="large")
+        with view_control:
+            chart_view = st.segmented_control(
+                "Chart view",
+                ["Price", "Points"],
+                default="Price",
+                key="comparison_chart_view",
             )
-            if average_scope == "Weeks in your squad":
-                ownership_by_gameweek = st.session_state.get(
-                    IMPORTED_SQUAD_HISTORY_KEY, {}
+        with position_control:
+            comparison_position = st.segmented_control(
+                "Positions shown",
+                ["All", *POSITION_ORDER],
+                default="All",
+                key=COMPARISON_POSITION_FILTER_KEY,
+                format_func=lambda position: {
+                    "All": "All positions",
+                    "GKP": "Goalkeepers",
+                    "DEF": "Defenders",
+                    "MID": "Midfielders",
+                    "FWD": "Forwards",
+                }[position],
+                help=(
+                    "Filter the selected or imported squad without changing the "
+                    "underlying player selection."
+                ),
+            )
+
+        selected_latest = latest[latest["player_id"].isin(selected_player_ids)]
+        comparison_latest = selected_latest
+        if comparison_position != "All":
+            comparison_latest = selected_latest[
+                selected_latest["position"] == comparison_position
+            ]
+        comparison_player_ids = comparison_latest["player_id"].tolist()
+
+        if comparison_position != "All":
+            st.caption(
+                f"Showing {len(comparison_player_ids)} of {len(selected_player_ids)} "
+                "selected players. Your full selection is unchanged."
+            )
+
+        if not comparison_player_ids:
+            st.info("No selected players match this position.")
+        else:
+            history = df[df["player_id"].isin(comparison_player_ids)]
+
+            st.subheader(f"{chart_view} Over Gameweeks")
+            render_player_trend_chart(history, chart_view)
+
+            st.subheader("Average Price vs. Average Score")
+            ownership_by_gameweek = None
+            if st.session_state[SELECTION_SOURCE_KEY] == "imported":
+                average_scope = st.segmented_control(
+                    "Average using",
+                    ["Weeks in your squad", "All gameweeks"],
+                    default="Weeks in your squad",
+                    key="price_score_average_scope",
                 )
-                st.caption(
-                    "Each player's price and score are averaged only across tracked "
-                    "gameweeks when that player was in your imported squad."
-                )
+                if average_scope == "Weeks in your squad":
+                    ownership_by_gameweek = st.session_state.get(
+                        IMPORTED_SQUAD_HISTORY_KEY, {}
+                    )
+                    st.caption(
+                        "Each player's price and score are averaged only across "
+                        "tracked gameweeks when that player was in your imported "
+                        "squad."
+                    )
+                else:
+                    st.caption(
+                        "Each player's price and score are averaged across every "
+                        "gameweek stored in this dashboard."
+                    )
             else:
                 st.caption(
-                    "Each player's price and score are averaged across every gameweek "
-                    "stored in this dashboard."
+                    "For manually selected players, price and score are averaged "
+                    "across every gameweek stored in this dashboard."
                 )
-        else:
-            st.caption(
-                "For manually selected players, price and score are averaged across "
-                "every gameweek stored in this dashboard."
-            )
-        render_price_score_scatter(history, ownership_by_gameweek)
+            render_price_score_scatter(history, ownership_by_gameweek)
 
-        st.subheader("Current Status")
-        status_cols = [
-            "web_name",
-            "team",
-            "position",
-            "status_icon",
-            "status_label",
-            "display_news",
-            "display_chance",
-        ]
-        status_df = (
-            latest[latest["player_id"].isin(selected_player_ids)][status_cols]
-            .assign(status=lambda d: d["status_icon"] + " " + d["status_label"])
-            .drop(columns=["status_icon", "status_label"])
-            .rename(
-                columns={
-                    "web_name": "Player",
-                    "team": "Team",
-                    "position": "Pos",
-                    "display_news": "News",
-                    "display_chance": "chance",
-                }
+            st.subheader("Current Status")
+            status_cols = [
+                "web_name",
+                "team",
+                "position",
+                "status_icon",
+                "status_label",
+                "display_news",
+                "display_chance",
+            ]
+            status_df = (
+                comparison_latest[status_cols]
+                .assign(status=lambda d: d["status_icon"] + " " + d["status_label"])
+                .drop(columns=["status_icon", "status_label"])
+                .rename(
+                    columns={
+                        "web_name": "Player",
+                        "team": "Team",
+                        "position": "Pos",
+                        "display_news": "News",
+                        "display_chance": "chance",
+                    }
+                )
+                .sort_values("Player")
             )
-            .sort_values("Player")
-        )
-        st.dataframe(
-            status_df,
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                "status": "Status",
-                "chance": st.column_config.ProgressColumn(
-                    "Chance of playing", min_value=0, max_value=100, format="%d%%"
-                ),
-            },
-        )
+            st.dataframe(
+                status_df,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "status": "Status",
+                    "chance": st.column_config.ProgressColumn(
+                        "Chance of playing", min_value=0, max_value=100, format="%d%%"
+                    ),
+                },
+            )
 
 with tab_table:
     search = st.text_input("Search player", placeholder="Type a name…")
