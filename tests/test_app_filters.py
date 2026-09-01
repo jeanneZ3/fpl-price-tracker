@@ -24,6 +24,22 @@ def test_default_selection_is_the_full_arsenal_squad():
     assert not app.exception
 
 
+def test_hero_capitalizes_gameweek():
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+
+    hero = next(
+        markdown.value
+        for markdown in app.markdown
+        if '<div class="fpl-hero">' in markdown.value
+        and "Compare FPL player prices" in markdown.value
+    )
+
+    assert "Gameweek points" in hero
+    assert "Data through Gameweek 2" in hero
+    assert "gameweek points" not in hero
+    assert "Data through gameweek" not in hero
+
+
 def test_bulk_team_selection_uses_player_ids_for_duplicate_names():
     conn = get_connection()
     try:
@@ -92,11 +108,94 @@ def test_imported_squad_replaces_selection_and_resets_filters():
     assert app.sidebar.multiselect[1].value == []
     assert app.sidebar.multiselect[2].value == imported_player_ids
     assert app.session_state["_selection_source"] == "imported"
-    assert app.segmented_control[1].label == "Average using"
-    assert app.segmented_control[1].options == [
+    assert app.segmented_control[1].label == "Positions shown"
+    assert app.segmented_control[1].value == "All"
+    assert app.segmented_control[2].label == "Average using"
+    assert app.segmented_control[2].options == [
         "Weeks in your squad",
         "All gameweeks",
     ]
+    assert not app.exception
+
+
+def test_position_filter_switches_imported_squad_without_changing_selection():
+    conn = get_connection()
+    try:
+        imported_rows = conn.execute(
+            """
+            SELECT player_id, position
+            FROM players
+            ORDER BY player_id
+            LIMIT 15
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    imported_player_ids = [player_id for player_id, _ in imported_rows]
+    defender_count = sum(position == "DEF" for _, position in imported_rows)
+    midfielder_count = sum(position == "MID" for _, position in imported_rows)
+    assert defender_count > 0
+    assert midfielder_count > 0
+
+    app = AppTest.from_file("app/app.py").run(timeout=30)
+    app.session_state["_pending_imported_squad"] = {
+        "player_ids": imported_player_ids,
+        "picks_by_gameweek": {1: tuple(imported_player_ids)},
+        "message": "Imported test squad.",
+    }
+    app.run(timeout=30)
+
+    position_filter = next(
+        control
+        for control in app.segmented_control
+        if control.label == "Positions shown"
+    )
+    assert position_filter.options == [
+        "All positions",
+        "Goalkeepers",
+        "Defenders",
+        "Midfielders",
+        "Forwards",
+    ]
+
+    position_filter.set_value("DEF").run(timeout=30)
+
+    assert app.session_state["players_to_compare"] == imported_player_ids
+    assert len(app.dataframe[0].value) == defender_count
+    assert set(app.dataframe[0].value["Pos"]) == {"DEF"}
+    assert any(
+        caption.value
+        == f"Showing {defender_count} of 15 selected players. "
+        "Your full selection is unchanged."
+        for caption in app.caption
+    )
+    defender_legends = [
+        markdown.value
+        for markdown in app.markdown
+        if "data-palette-version" in markdown.value
+    ]
+    assert len(defender_legends) == 2
+    assert all("Defender" in legend for legend in defender_legends)
+    assert all("Midfielder" not in legend for legend in defender_legends)
+
+    next(
+        control
+        for control in app.segmented_control
+        if control.label == "Positions shown"
+    ).set_value("MID").run(timeout=30)
+
+    assert app.session_state["players_to_compare"] == imported_player_ids
+    assert len(app.dataframe[0].value) == midfielder_count
+    assert set(app.dataframe[0].value["Pos"]) == {"MID"}
+    midfielder_legends = [
+        markdown.value
+        for markdown in app.markdown
+        if "data-palette-version" in markdown.value
+    ]
+    assert len(midfielder_legends) == 2
+    assert all("Midfielder" in legend for legend in midfielder_legends)
+    assert all("Defender" not in legend for legend in midfielder_legends)
     assert not app.exception
 
 
@@ -173,7 +272,8 @@ def test_manual_player_changes_wait_for_apply_button():
 
     assert app.session_state["players_to_compare"] == new_selection_ids
     assert app.session_state["_selection_source"] == "manual"
-    assert len(app.segmented_control) == 1
+    assert len(app.segmented_control) == 2
+    assert app.session_state["comparison_position_filter"] == "All"
     assert not app.exception
 
 
