@@ -2,6 +2,7 @@ import json
 
 from streamlit.testing.v1 import AppTest
 
+from src.dashboard.chart_helpers import get_team_color
 from src.database.database_setup import get_connection
 
 
@@ -123,7 +124,7 @@ def test_position_filter_switches_imported_squad_without_changing_selection():
     try:
         imported_rows = conn.execute(
             """
-            SELECT player_id, position
+            SELECT player_id, position, team
             FROM players
             ORDER BY player_id
             LIMIT 15
@@ -132,9 +133,15 @@ def test_position_filter_switches_imported_squad_without_changing_selection():
     finally:
         conn.close()
 
-    imported_player_ids = [player_id for player_id, _ in imported_rows]
-    defender_count = sum(position == "DEF" for _, position in imported_rows)
-    midfielder_count = sum(position == "MID" for _, position in imported_rows)
+    imported_player_ids = [player_id for player_id, _, _ in imported_rows]
+    defender_teams = {
+        team for _, position, team in imported_rows if position == "DEF"
+    }
+    midfielder_teams = {
+        team for _, position, team in imported_rows if position == "MID"
+    }
+    defender_count = sum(position == "DEF" for _, position, _ in imported_rows)
+    midfielder_count = sum(position == "MID" for _, position, _ in imported_rows)
     assert defender_count > 0
     assert midfielder_count > 0
 
@@ -176,8 +183,25 @@ def test_position_filter_switches_imported_squad_without_changing_selection():
         if "data-palette-version" in markdown.value
     ]
     assert len(defender_legends) == 2
-    assert all("Defender" in legend for legend in defender_legends)
-    assert all("Midfielder" not in legend for legend in defender_legends)
+    assert all(">Team<" in legend for legend in defender_legends)
+    assert all(
+        all(team in legend for team in defender_teams)
+        for legend in defender_legends
+    )
+    trend_spec = json.loads(app.get("vega_lite_chart")[0].proto.spec)
+    trend_colors = {
+        layer["mark"].get("color")
+        for layer in trend_spec["layer"]
+        if isinstance(layer.get("mark"), dict)
+    }
+    assert {get_team_color(team) for team in defender_teams} <= trend_colors
+    scatter_spec = json.loads(app.get("vega_lite_chart")[1].proto.spec)
+    scatter_colors = {
+        layer["mark"].get("color")
+        for layer in scatter_spec["layer"]
+        if isinstance(layer.get("mark"), dict)
+    }
+    assert {get_team_color(team) for team in defender_teams} <= scatter_colors
 
     next(
         control
@@ -194,8 +218,11 @@ def test_position_filter_switches_imported_squad_without_changing_selection():
         if "data-palette-version" in markdown.value
     ]
     assert len(midfielder_legends) == 2
-    assert all("Midfielder" in legend for legend in midfielder_legends)
-    assert all("Defender" not in legend for legend in midfielder_legends)
+    assert all(">Team<" in legend for legend in midfielder_legends)
+    assert all(
+        all(team in legend for team in midfielder_teams)
+        for legend in midfielder_legends
+    )
     assert not app.exception
 
 

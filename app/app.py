@@ -2,9 +2,8 @@
 
 Layout: a hero header, sidebar filters, and two tabs ("Compare Players"
 for trend charts, "Player Profile" for the full table). Chart color encodes
-*position* -- see src/dashboard/chart_helpers.py -- so a legend stays
-meaningful once more than a couple of players are selected, instead of
-burning a unique hue per player.
+*position* when every position is visible, then switches to *team* when one
+position is selected so the freed-up color channel carries useful detail.
 """
 
 import sys
@@ -20,6 +19,7 @@ from src.dashboard.chart_helpers import (
     POSITION_LABELS,
     POSITION_ORDER,
     compute_point_offsets,
+    get_team_color,
 )
 from src.dashboard.scatter_helpers import prepare_price_score_averages
 from src.dashboard.status_helpers import prepare_availability_display
@@ -424,6 +424,25 @@ def render_position_legend(positions: list[str] | None = None) -> None:
     )
 
 
+def render_team_legend(teams: list[str]) -> None:
+    """Render the club feature colors used in a single-position view."""
+    items = "".join(
+        (
+            '<span class="position-legend-item">'
+            f'<span class="position-legend-dot" style="background:{get_team_color(team)}"></span>'
+            f"{team}</span>"
+        )
+        for team in sorted(set(teams), key=str.casefold)
+    )
+    st.markdown(
+        (
+            '<div class="position-legend" data-palette-version="team-v1">'
+            f'<span class="position-legend-title">Team</span>{items}</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
 def apply_chart_theme(chart: alt.TopLevelMixin) -> alt.TopLevelMixin:
     """Apply the dashboard's shared typography and subtle chart furniture."""
     return (
@@ -444,7 +463,9 @@ def apply_chart_theme(chart: alt.TopLevelMixin) -> alt.TopLevelMixin:
     )
 
 
-def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
+def render_player_trend_chart(
+    history: pd.DataFrame, view: str, *, color_by_team: bool = False
+) -> None:
     chart_config = {
         "Price": {
             "field": "price",
@@ -503,7 +524,11 @@ def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
     for player_id, x_offset in offset_by_player.items():
         player_history = history[history["player_id"] == player_id]
         player_chart = alt.Chart(player_history)
-        player_color = get_chart_position_color(player_history["position"].iloc[0])
+        player_color = (
+            get_team_color(player_history["team"].iloc[0])
+            if color_by_team
+            else get_chart_position_color(player_history["position"].iloc[0])
+        )
         chart_layers.extend(
             [
                 player_chart.mark_line(
@@ -582,13 +607,18 @@ def render_player_trend_chart(history: pd.DataFrame, view: str) -> None:
         .interactive()
     )
     chart = apply_chart_theme(chart)
-    render_position_legend(history["position"].unique().tolist())
+    if color_by_team:
+        render_team_legend(history["team"].unique().tolist())
+    else:
+        render_position_legend(history["position"].unique().tolist())
     st.altair_chart(chart, use_container_width=True)
 
 
 def render_price_score_scatter(
     history: pd.DataFrame,
     ownership_by_gameweek: dict[int, tuple[int, ...]] | None = None,
+    *,
+    color_by_team: bool = False,
 ) -> None:
     averages = prepare_price_score_averages(history, ownership_by_gameweek)
     if averages.empty:
@@ -620,7 +650,11 @@ def render_price_score_scatter(
     ):
         player_average = averages[averages["player_id"] == player_id]
         player_chart = alt.Chart(player_average)
-        player_color = get_chart_position_color(player_average["position"].iloc[0])
+        player_color = (
+            get_team_color(player_average["team"].iloc[0])
+            if color_by_team
+            else get_chart_position_color(player_average["position"].iloc[0])
+        )
         chart_layers.append(
             player_chart.mark_circle(
                 filled=True,
@@ -689,7 +723,10 @@ def render_price_score_scatter(
 
     chart = alt.layer(*chart_layers).properties(height=420).interactive()
     chart = apply_chart_theme(chart)
-    render_position_legend(averages["position"].unique().tolist())
+    if color_by_team:
+        render_team_legend(averages["team"].unique().tolist())
+    else:
+        render_position_legend(averages["position"].unique().tolist())
     st.altair_chart(chart, use_container_width=True)
 
 
@@ -1028,9 +1065,12 @@ with tab_compare:
             st.info("No selected players match this position.")
         else:
             history = df[df["player_id"].isin(comparison_player_ids)]
+            color_by_team = comparison_position != "All"
 
             st.subheader(f"{chart_view} Over Gameweeks")
-            render_player_trend_chart(history, chart_view)
+            render_player_trend_chart(
+                history, chart_view, color_by_team=color_by_team
+            )
 
             st.subheader("Average Price vs. Average Score")
             ownership_by_gameweek = None
@@ -1060,7 +1100,11 @@ with tab_compare:
                     "For manually selected players, price and score are averaged "
                     "across every gameweek stored in this dashboard."
                 )
-            render_price_score_scatter(history, ownership_by_gameweek)
+            render_price_score_scatter(
+                history,
+                ownership_by_gameweek,
+                color_by_team=color_by_team,
+            )
 
             st.subheader("Current Status")
             status_cols = [

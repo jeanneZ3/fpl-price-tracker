@@ -21,6 +21,33 @@ from src.dashboard.scatter_helpers import prepare_price_score_averages
 
 
 class TestGetTeamColor:
+    def test_palette_covers_all_2026_27_premier_league_teams(self):
+        current_teams = {
+            "Arsenal",
+            "Aston Villa",
+            "Bournemouth",
+            "Brentford",
+            "Brighton",
+            "Chelsea",
+            "Coventry City",
+            "Crystal Palace",
+            "Everton",
+            "Fulham",
+            "Hull City",
+            "Ipswich Town",
+            "Leeds",
+            "Liverpool",
+            "Man City",
+            "Man Utd",
+            "Newcastle",
+            "Nott'm Forest",
+            "Spurs",
+            "Sunderland",
+        }
+
+        assert len(current_teams) == 20
+        assert current_teams <= TEAM_COLORS.keys()
+
     def test_known_team_returns_mapped_hex(self):
         assert get_team_color("Arsenal") == TEAM_COLORS["Arsenal"]
 
