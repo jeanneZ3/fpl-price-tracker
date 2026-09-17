@@ -45,6 +45,7 @@ SELECTION_SOURCE_KEY = "_selection_source"
 IMPORTED_SQUAD_HISTORY_KEY = "_imported_squad_history"
 DEFAULT_TEAM = "Arsenal"
 MAX_DIRECT_CHART_LABELS = 12
+MAX_POINTS_GAMEWEEK_OFFSET = 24.0
 
 STATUS_LABELS = {
     "a": "Available",
@@ -507,7 +508,9 @@ def render_player_trend_chart(
     # per-player mark offsets, so Vega-Lite cannot stretch them across the
     # full gameweek band.
     last_gw_rows["x_offset"] = compute_point_offsets(
-        last_gw_rows[value_field], spacing=12.0
+        last_gw_rows[value_field],
+        spacing=12.0,
+        max_offset=MAX_POINTS_GAMEWEEK_OFFSET if view == "Points" else None,
     )
     offset_by_player = dict(zip(last_gw_rows["player_id"], last_gw_rows["x_offset"]))
 
