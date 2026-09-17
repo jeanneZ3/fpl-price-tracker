@@ -507,10 +507,16 @@ def render_player_trend_chart(
     # though they belong to different gameweeks. These become literal
     # per-player mark offsets, so Vega-Lite cannot stretch them across the
     # full gameweek band.
+    offset_spacing = 12.0
+    if view == "Points":
+        largest_collision = int(last_gw_rows.groupby(value_field).size().max())
+        if largest_collision > 1:
+            offset_spacing = min(
+                offset_spacing,
+                (2 * MAX_POINTS_GAMEWEEK_OFFSET) / (largest_collision - 1),
+            )
     last_gw_rows["x_offset"] = compute_point_offsets(
-        last_gw_rows[value_field],
-        spacing=12.0,
-        max_offset=MAX_POINTS_GAMEWEEK_OFFSET if view == "Points" else None,
+        last_gw_rows[value_field], spacing=offset_spacing
     )
     offset_by_player = dict(zip(last_gw_rows["player_id"], last_gw_rows["x_offset"]))
 
