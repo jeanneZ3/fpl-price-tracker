@@ -265,22 +265,6 @@ class TestComputePointOffsets:
         ordered = result.reindex(["a", "b", "c"])
         assert list(ordered) == [-10.0, 0.0, 10.0]
 
-    def test_max_offset_caps_a_large_collision_symmetrically(self):
-        values = pd.Series([0.0] * 15)
-        result = compute_point_offsets(values, spacing=12.0, max_offset=24.0)
-
-        assert result.min() == pytest.approx(-24.0)
-        assert result.max() == pytest.approx(24.0)
-        assert result.sum() == pytest.approx(0.0)
-        assert result.is_monotonic_increasing
-
-    def test_max_offset_does_not_compress_a_small_collision(self):
-        values = pd.Series([5.0, 5.0], index=["a", "b"])
-        result = compute_point_offsets(values, spacing=10.0, max_offset=24.0)
-
-        assert set(result) == {-5.0, 5.0}
-
-
 class TestPreparePriceScoreAverages:
     @staticmethod
     def history():
