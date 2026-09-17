@@ -276,6 +276,14 @@ def test_chart_view_switches_while_price_score_scatter_remains_visible():
     assert app.segmented_control[0].value == "Points"
     assert len(app.get("vega_lite_chart")) == 2
     assert "Points Over Gameweeks" in [heading.value for heading in app.subheader]
+    points_spec = json.loads(app.get("vega_lite_chart")[0].proto.spec)
+    point_view_offsets = [
+        layer["mark"].get("xOffset", 0)
+        for layer in points_spec["layer"]
+        if layer["mark"]["type"] in {"line", "point"}
+    ]
+    assert point_view_offsets
+    assert max(abs(offset) for offset in point_view_offsets) <= 24.0
     assert not app.exception
 
 
